@@ -171,6 +171,25 @@ export function isAllowedAurevionOrigin(origin: string | undefined) {
   return ENV.allowedOrigins.includes(origin);
 }
 
+async function askPythonBrain(message: string, sessionId: string) {
+  if (!ENV.pythonBrainUrl) return null;
+  const base = ENV.pythonBrainUrl.replace(/\/$/, "");
+  try {
+    const response = await fetch(`${base}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, session_id: sessionId }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { handled?: boolean; reply?: string; action?: string; tool?: string };
+    return data;
+  } catch (error) {
+    console.warn("[AUREVION] Python brain unavailable; continuing with Groq:", error);
+    return null;
+  }
+}
+
 export function isAuthorizedAurevionClient(providedKey: string | undefined) {
   if (!ENV.aurevionClientApiKey) return !ENV.isProduction;
   if (!providedKey) return false;
@@ -245,12 +264,18 @@ export async function chatWithAurevion(options: ChatOptions) {
   }
 
   const context = [...state.context, latestUserMessage].slice(-MAX_CONTEXT_MESSAGES);
+  const pythonResult = await askPythonBrain(latestUserMessage.content, sessionKey);
+  const brainHint = pythonResult?.handled
+    ? `\nنتيجة طبقة العقل المحلي: ${pythonResult.reply ?? "تم تنفيذ الإجراء المحلي."}${pythonResult.action ? ` (action=${pythonResult.action})` : ""}. أجب للمستخدم أنت عبر Groq مع توضيح النتيجة.`
+    : pythonResult?.tool
+      ? `\nحدد العقل المحلي الأداة المطلوبة: ${pythonResult.tool}. إن لم تتوفر نتيجة الأداة، صرّح بذلك ولا تخترع بيانات.`
+      : "";
   const model = options.webSearch ? "groq/compound-mini" : ENV.groqModel;
   let reply: string;
   let usedModel = model;
   try {
     reply = await callGroq(model, [
-      { role: "system", content: IDENTITY_PROMPT },
+      { role: "system", content: `${IDENTITY_PROMPT}${brainHint}` },
       ...context,
     ]);
   } catch (error) {

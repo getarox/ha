@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { trpc } from "@/lib/trpc";
 import { ArrowUpRight, ImagePlus, Loader2, Sparkles, Upload, WandSparkles } from "lucide-react";
 
 const modes = [
@@ -19,7 +18,9 @@ export default function ImageStudio() {
   const [pro, setPro] = useState(false);
   const [sessionId] = useState(() => `studio-${crypto.randomUUID()}`);
   const inputRef = useRef<HTMLInputElement>(null);
-  const mutation = trpc.aurevion.imageStudio.useMutation();
+  const [result, setResult] = useState<any>();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -32,9 +33,16 @@ export default function ImageStudio() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = () => {
-    if (!prompt.trim()) return;
-    mutation.mutate({ sessionId, mode, prompt: prompt.trim(), imageBase64, pro });
+  const handleSubmit = async () => {
+    if (!prompt.trim() || pending) return;
+    setPending(true); setError(undefined);
+    try {
+      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt: prompt.trim(), imageBase64, pro }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر تنفيذ عملية الصور.");
+      setResult(data);
+    } catch (err: any) { setError(err?.message || "تعذر تنفيذ عملية الصور."); }
+    finally { setPending(false); }
   };
 
   const needsImage = mode !== "generate";
@@ -68,14 +76,14 @@ export default function ImageStudio() {
             </div>
 
             <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm text-slate-300"><input type="checkbox" checked={pro} onChange={(event) => setPro(event.target.checked)} className="h-4 w-4 accent-cyan-300" /> استخدام وضع Banana Pro <span className="mr-auto text-xs text-amber-200">لخطة Pro</span></label>
-            <Button onClick={handleSubmit} disabled={mutation.isPending || !prompt.trim() || (needsImage && !imageBase64)} className="mt-5 h-12 w-full bg-cyan-300 text-base font-semibold text-slate-950 hover:bg-cyan-200">{mutation.isPending ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ التنفيذ...</> : <><Sparkles className="ml-2 h-4 w-4" /> تنفيذ العملية</>}</Button>
-            {mutation.error && <p className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{mutation.error.message}</p>}
+            <Button onClick={handleSubmit} disabled={pending || !prompt.trim() || (needsImage && !imageBase64)} className="mt-5 h-12 w-full bg-cyan-300 text-base font-semibold text-slate-950 hover:bg-cyan-200">{pending ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ التنفيذ...</> : <><Sparkles className="ml-2 h-4 w-4" /> تنفيذ العملية</>}</Button>
+            {error && <p className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{error}</p>}
           </div>
 
           <div className="rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-300/[0.08] to-transparent p-5 sm:p-7">
             <div className="flex items-center gap-3"><ImagePlus className="h-5 w-5 text-cyan-200" /><h2 className="text-xl font-medium">نتيجة أوريفون</h2></div>
-            {!mutation.data && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب طلبًا واضحًا، واختر العملية المناسبة. في وضع Pro تحصل على نموذج Banana Pro عند تفعيل خطتك.</p></div>}
-            {mutation.data && <div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{mutation.data.text}</div>{mutation.data.kind === "image" && mutation.data.imageDataUrl && <img src={mutation.data.imageDataUrl} alt="نتيجة مولدة من أوريفون" className="w-full rounded-2xl border border-white/10 object-contain" />}<div className="flex items-center justify-between text-xs text-slate-500"><span>النموذج: {mutation.data.model}</span><span>المتبقي: {mutation.data.remaining}</span></div></div>}
+            {!result && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب طلبًا واضحًا، واختر العملية المناسبة. في وضع Pro تحصل على نموذج Banana Pro عند تفعيل خطتك.</p></div>}
+            {result && <div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{result.text}</div>{result.kind === "image" && result.imageDataUrl && <img src={result.imageDataUrl} alt="نتيجة مولدة من أوريفون" className="w-full rounded-2xl border border-white/10 object-contain" />}<div className="flex items-center justify-between text-xs text-slate-500"><span>النموذج: {result.model}</span><span>المتبقي: {result.remaining}</span></div></div>}
           </div>
         </section>
       </div>

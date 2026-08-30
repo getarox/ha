@@ -8,6 +8,7 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   groqApiKey: process.env.GROQ_API_KEY ?? "",
+  pythonBrainUrl: process.env.AUREVION_PYTHON_BRAIN_URL ?? "",
   aurevionClientApiKey: process.env.AUREVION_CLIENT_API_KEY ?? "",
   groqModel: process.env.GROQ_MODEL ?? "openai/gpt-oss-20b",
   groqVisionModel: process.env.GROQ_VISION_MODEL ?? "qwen/qwen3.6-27b",
