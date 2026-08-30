@@ -1,0 +1,1 @@
+ALTER TABLE `aurevion_sessions` ADD `imagesUsed` int DEFAULT 0 NOT NULL;

@@ -1,0 +1,8 @@
+AUREVION Robot Brain
+Copyright 2026 AUREVION Contributors
+
+This project is an open-source robotic brain prototype intended for integration into the AUREVION robotic smartphone concept.
+
+The AUREVION name, logo, product name, industrial design, phone design, and related trademarks are not granted under the Apache License, Version 2.0. Permission to use the software does not grant permission to use those marks in a way that suggests endorsement or affiliation.
+
+Groq is an external service. Use of the Groq API, its models, Compound systems, pricing, and service terms are governed by Groq's own terms and documentation. API credentials must be supplied by the device owner or operator and must never be committed to source control.

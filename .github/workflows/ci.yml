@@ -1,0 +1,26 @@
+name: AUREVION CI
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Reject obvious secret files
+        run: |
+          test ! -e .env
+          test ! -e .env.local
+          test ! -e harth.txt
+          ! grep -RInE '(GROQ_API_KEY|GEMINI_API_KEY|sk-[A-Za-z0-9]{20,})\s*[:=]\s*[^$<[:space:]]+' --exclude-dir=node_modules --exclude-dir=.git .
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
