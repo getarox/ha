@@ -2,7 +2,14 @@
   "version": 2,
   "buildCommand": "pnpm run build",
   "functions": {
-    "api/**/*.ts": {
+    "api/chat.ts": {
+      "runtime": "@vercel/node@5.0.0",
+      "includeFiles": [
+        "server/**",
+        "shared/**"
+      ]
+    },
+    "api/health.ts": {
       "runtime": "@vercel/node@5.0.0"
     }
   }
