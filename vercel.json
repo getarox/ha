@@ -1,18 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "pnpm run build",
-  "functions": {
-    "api/index.ts": {
-      "runtime": "nodejs24.x"
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
-    },
-    {
-      "handle": "filesystem"
-    }
-  ]
+  "buildCommand": "pnpm run build"
 }
