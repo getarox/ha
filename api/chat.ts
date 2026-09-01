@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { chatWithAurevion, isAllowedAurevionOrigin, isAuthorizedAurevionClient } from "../server/aurevion";
+import { chatWithAurevion, isAllowedAurevionOrigin, isAuthorizedAurevionClient } from "../server/aurevion.ts";
 
 function cors(req: VercelRequest, res: VercelResponse) {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
