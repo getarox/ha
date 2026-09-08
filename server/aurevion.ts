@@ -270,8 +270,9 @@ export async function chatWithAurevion(options: ChatOptions) {
   let liveResult: { tool: string; text: string } | null = null;
   try { liveResult = await getLiveContext(latestUserMessage.content); }
   catch (error) { console.warn("[AUREVION] Live tool unavailable:", error); }
+  const wantsFreshData = /(اليوم|الآن|حالي|حاليًا|آخر|اخر|جديد|حديث|2025|2026|خبر|أخبار|سعر|طقس|نتيجة|موعد|live|latest|today|now)/i.test(latestUserMessage.content);
   let webResults = "";
-  if (options.webSearch) {
+  if (options.webSearch || wantsFreshData) {
     try { webResults = formatSearchContext(await searchWeb(latestUserMessage.content)); }
     catch (error) { console.warn("[AUREVION] Web search unavailable:", error); }
   }
@@ -281,27 +282,20 @@ export async function chatWithAurevion(options: ChatOptions) {
       ? `\nحدد العقل المحلي الأداة المطلوبة: ${pythonResult.tool}. إن لم تتوفر نتيجة الأداة، صرّح بذلك ولا تخترع بيانات.`
       : "";
   const liveHint = liveResult ? `\nبيانات لحظية من أداة ${liveResult.tool}: ${liveResult.text}\nاستخدم هذه البيانات كما هي واذكر المصدر ووقت التحديث، ولا تدّعي أنها معرفة قديمة.` : "";
+  const currentDate = new Date().toISOString().slice(0, 10);
   const webHint = webResults ? `\nنتائج البحث المباشر الموثقة:\n${webResults}\nاستخدمها للإجابة واذكر روابط المصادر.` : "";
-  const model = options.webSearch ? "groq/compound-mini" : ENV.groqModel;
+  const freshnessHint = `\nتاريخ النظام الحالي: ${currentDate}. لا تقل إن معرفتك متوقفة عند 2024؛ إذا كان السؤال عن معلومات حديثة فاعتمد على البيانات اللحظية المرفقة، وإذا لم تتوفر فاذكر بوضوح أنك لا تملك تحققًا مباشرًا.`;
+  const model = ENV.groqModel;
   let reply: string;
   let usedModel = model;
   try {
     reply = await callGroq(model, [
-      { role: "system", content: `${IDENTITY_PROMPT}${brainHint}${liveHint}${webHint}` },
+      { role: "system", content: `${IDENTITY_PROMPT}${freshnessHint}${brainHint}${liveHint}${webHint}` },
       ...context,
     ]);
   } catch (error) {
-    const status = (error as { status?: number }).status;
-    if (options.webSearch && (status === 400 || status === 404)) {
-      usedModel = ENV.groqModel;
-      reply = await callGroq(ENV.groqModel, [
-        { role: "system", content: `${IDENTITY_PROMPT}${liveHint}${webHint}\nلم تتوفر أداة البحث في هذه المحاولة؛ أجب من معرفتك وصرّح بأنك لم تبحث.` },
-        ...context,
-      ]);
-    } else {
-      console.error("[AUREVION] Groq request failed:", error);
-      throw new TRPCError({ code: "BAD_GATEWAY", message: "تعذر الحصول على رد من Groq الآن." });
-    }
+    console.error("[AUREVION] Groq request failed:", error);
+    throw new TRPCError({ code: "BAD_GATEWAY", message: "تعذر الحصول على رد من Groq الآن." });
   }
 
   state.messagesUsed += 1;
@@ -310,7 +304,7 @@ export async function chatWithAurevion(options: ChatOptions) {
   return {
     reply,
     model: usedModel,
-    searched: usedModel === "groq/compound-mini",
+    searched: Boolean(webResults),
     plan: state.plan,
     remaining: Math.max(0, limit - state.messagesUsed),
   };
