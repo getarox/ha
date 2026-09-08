@@ -25,7 +25,7 @@ export async function getExchange(from: string, to: string): Promise<LiveResult>
 export async function getLiveContext(message: string): Promise<LiveResult | null> {
   const lower = message.toLowerCase();
   if (/(طقس|الجو|حرارة|درجة الحرارة|weather|temperature)/i.test(lower)) {
-    const location = message.replace(/.*?(طقس|الجو|حرارة|درجة الحرارة|weather|temperature)/i, "").replace(/(في|بـ|ب|بمدينة|بمدينه)/i, "").trim() || "بغداد";
+    const location = message.replace(/.*?(طقس|الجو|حرارة|درجة الحرارة|weather|temperature)/i, "").replace(/^\s*(?:في|بـ|بمدينة|بمدينه|ب)\s+/i, "").replace(/[؟?!،,.]+$/, "").trim() || "بغداد";
     return getWeather(location);
   }
   if (/(سعر الصرف|صرف|دولار|دينار|يورو|exchange|currency)/i.test(lower)) {

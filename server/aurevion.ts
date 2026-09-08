@@ -269,7 +269,7 @@ export async function chatWithAurevion(options: ChatOptions) {
   const pythonResult = await askPythonBrain(latestUserMessage.content, sessionKey);
   let liveResult: { tool: string; text: string } | null = null;
   try { liveResult = await getLiveContext(latestUserMessage.content); }
-  catch (error) { console.warn("[AUREVION] Live tool unavailable:", error); }
+  catch (error) { console.warn("[AUREVION] Live tool unavailable:", error); liveResult = { tool: "weather", text: `تعذر جلب البيانات اللحظية لهذه المحاولة: ${error instanceof Error ? error.message : "المدينة أو الخدمة غير متاحة"}. لا تقل إن الوصول للطقس غير ممكن عمومًا؛ اطلب من المستخدم اسم مدينة أوضح.` }; }
   const wantsFreshData = /(اليوم|الآن|حالي|حاليًا|آخر|اخر|جديد|حديث|2025|2026|خبر|أخبار|سعر|طقس|نتيجة|موعد|live|latest|today|now)/i.test(latestUserMessage.content);
   let webResults = "";
   if (options.webSearch || wantsFreshData) {
