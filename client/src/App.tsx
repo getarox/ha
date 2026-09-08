@@ -6,7 +6,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Owner from "./pages/Owner";
-import ImageStudio from "./pages/ImageStudio";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -14,7 +13,6 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/owner"} component={Owner} />
-      <Route path={"/studio"} component={ImageStudio} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

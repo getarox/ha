@@ -11,6 +11,7 @@ import {
   FileText,
   Flag,
   History,
+  ImagePlus,
   LifeBuoy,
   Loader2,
   LogIn,
@@ -49,6 +50,7 @@ type SpeechWindowLike = Window & {
 export type Message = {
   role: "system" | "user" | "assistant";
   content: string;
+  imageUrl?: string;
 };
 
 export type AIChatBoxProps = {
@@ -60,6 +62,7 @@ export type AIChatBoxProps = {
   height?: string | number;
   emptyStateMessage?: string;
   suggestedPrompts?: string[];
+  onGenerateImage?: (prompt: string) => void | Promise<void>;
 };
 
 export function AIChatBox({
@@ -71,6 +74,7 @@ export function AIChatBox({
   height = "600px",
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
+  onGenerateImage,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -245,6 +249,17 @@ export function AIChatBox({
     textareaRef.current?.focus();
   };
 
+  const handleGenerateImage = () => {
+    const prompt = input.trim();
+    if (!prompt || isLoading || !onGenerateImage) {
+      setRecordingStatus("اكتب وصف الصورة أولًا، ثم اضغط إنشاء صورة.");
+      textareaRef.current?.focus();
+      return;
+    }
+    setInput("");
+    void onGenerateImage(prompt);
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -296,7 +311,7 @@ export function AIChatBox({
               const shouldApplyMinHeight = isLastMessage && !isLoading && minHeightForLastMessage > 0;
               return <div key={index} className={cn("flex items-start gap-3", message.role === "user" ? "justify-end" : "justify-start")} style={shouldApplyMinHeight ? { minHeight: `${minHeightForLastMessage}px` } : undefined}>
                 {message.role === "assistant" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10"><Sparkles className="size-4 text-primary" /></div>}
-                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <><div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div><button type="button" onClick={() => void playAssistantVoice(message.content, index)} disabled={voiceLoading === index} className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-100">{voiceLoading === index ? <Loader2 className="size-3 animate-spin" /> : <Volume2 className="size-3" />} استمع</button></> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
+                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <><div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div>{message.imageUrl && <img src={message.imageUrl} alt="صورة منشأة داخل المحادثة" className="mt-3 max-h-[28rem] w-full rounded-xl border border-white/10 object-contain" />}<button type="button" onClick={() => void playAssistantVoice(message.content, index)} disabled={voiceLoading === index} className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-100">{voiceLoading === index ? <Loader2 className="size-3 animate-spin" /> : <Volume2 className="size-3" />} استمع</button></> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
                 {message.role === "user" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary"><User className="size-4 text-secondary-foreground" /></div>}
               </div>;
             })}
@@ -334,6 +349,7 @@ export function AIChatBox({
         <div className="flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-1">
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={() => fileInputRef.current?.click()} aria-label="إرفاق ملفات"><Paperclip className="size-4" /></Button>
+          {onGenerateImage && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={handleGenerateImage} aria-label="إنشاء صورة من الوصف" title="إنشاء صورة من الوصف"><ImagePlus className="size-4" /></Button>}
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onClick={() => void handleRecordToggle()} aria-label={isRecording ? "إيقاف التسجيل" : "بدء التسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية لمدة خمس دقائق" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", settingsOpen && "bg-cyan-300/15 text-cyan-200")} onClick={() => setSettingsOpen((current) => !current)} aria-label="فتح الإعدادات" aria-expanded={settingsOpen}><Settings2 className="size-4" /></Button>

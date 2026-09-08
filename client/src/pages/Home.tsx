@@ -116,6 +116,31 @@ export default function Home() {
     }).finally(() => setChatPending(false));
   };
 
+  const handleGenerateImage = async (prompt: string) => {
+    const nextMessages: Message[] = [...messages, { role: "user", content: `إنشاء صورة: ${prompt}` }];
+    setMessages(nextMessages);
+    setFaceState("thinking");
+    setChatPending(true);
+    try {
+      const response = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, mode: "generate", prompt, pro: false }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر إنشاء الصورة الآن.");
+      if (data.kind !== "image" || typeof data.imageDataUrl !== "string") throw new Error("لم تُرجع خدمة الصور صورة صالحة.");
+      setMessages((current) => [...current, { role: "assistant", content: data.text || "تم إنشاء الصورة داخل المحادثة.", imageUrl: data.imageDataUrl }]);
+      setFaceState("replying");
+      window.setTimeout(() => setFaceState("idle"), 900);
+    } catch (error: any) {
+      setMessages((current) => [...current, { role: "assistant", content: `تعذر إنشاء الصورة. ${error?.message || "حاول مرة أخرى."}` }]);
+      setFaceState("idle");
+    } finally {
+      setChatPending(false);
+    }
+  };
+
   return (
     <div className="aurevion-shell min-h-screen overflow-hidden text-white" dir="rtl">
       <div className="aurevion-noise" />
@@ -131,7 +156,6 @@ export default function Home() {
           <a href="#brain" className="transition hover:text-cyan-300">العقل</a>
           <a href="#conversation" className="transition hover:text-cyan-300">المحادثة</a>
           <a href="#plans" className="transition hover:text-cyan-300">الخطط</a>
-          <Link href="/studio" className="transition hover:text-cyan-300">استوديو الصور</Link>
           <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع الرسمي <ArrowUpRight className="h-3.5 w-3.5" /></a>
         </nav>
         <div className="flex items-center gap-2">
@@ -153,7 +177,6 @@ export default function Home() {
             <p className="mt-7 max-w-xl text-lg leading-8 text-slate-300">أوريفون عقل روبوتي مفتوح المصدر مبني على Groq، مصمم ليكون الرفيق الذكي لهاتف AUREVION الروبوتي؛ يفهم، يحلل، يبحث، ويستجيب لك بطريقة إنسانية.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#conversation"><Button size="lg" className="bg-cyan-300 px-6 text-slate-950 shadow-[0_0_32px_rgba(34,211,238,0.2)] hover:bg-cyan-200">جرّب العقل <ArrowUpRight className="mr-2 h-4 w-4" /></Button></a>
-              <Link href="/studio"><Button size="lg" variant="outline" className="border-cyan-300/25 bg-cyan-300/[0.04] px-6 text-cyan-100 hover:bg-cyan-300/10">استوديو الصور <Sparkles className="mr-2 h-4 w-4" /></Button></Link>
               <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer"><Button size="lg" variant="outline" className="border-white/15 bg-white/[0.03] px-6 text-white hover:bg-white/10">زيارة الموقع الرسمي</Button></a>
             </div>
             <div className="mt-12 grid max-w-xl grid-cols-3 gap-5 border-t border-white/10 pt-6">
@@ -187,7 +210,7 @@ export default function Home() {
           </div>
           <div className="aurevion-chat-wrap">
             <div className="mb-3 flex items-center justify-between px-1"><span className="eyebrow">LIVE CONVERSATION</span><span className="flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> اتصال محمي</span></div>
-            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
+            <AIChatBox messages={messages} onSendMessage={handleSend} onGenerateImage={handleGenerateImage} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
           </div>
         </section>
 
