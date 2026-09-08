@@ -3,7 +3,6 @@ import { startLogin } from "@/const";
 import { AIChatBox, type Message } from "@/components/AIChatBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { trpc } from "@/lib/trpc";
 import {
   ArrowUpRight,
   Bot,
@@ -16,7 +15,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 
 type FaceState = "idle" | "listening" | "thinking" | "replying";
@@ -57,24 +56,7 @@ export default function Home() {
   const [webSearch, setWebSearch] = useState(false);
   const [faceState, setFaceState] = useState<FaceState>("idle");
   const [sessionId] = useState(getSessionId);
-  const chatMutation = trpc.aurevion.chat.useMutation({
-    onSuccess: (response) => {
-      setMessages((current) => [...current, { role: "assistant", content: response.reply }]);
-      setFaceState("replying");
-      window.setTimeout(() => setFaceState("idle"), 900);
-    },
-    onError: (error) => {
-      setMessages((current) => [...current, {
-        role: "assistant",
-        content: `تعذر إكمال الطلب الآن. ${error.message}`,
-      }]);
-      setFaceState("idle");
-    },
-  });
-
-  useEffect(() => {
-    if (chatMutation.isPending) setFaceState("thinking");
-  }, [chatMutation.isPending]);
+  const [chatPending, setChatPending] = useState(false);
 
   const status = faceCopy[faceState];
   const messageCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
@@ -86,7 +68,22 @@ export default function Home() {
     );
     setMessages(nextMessages);
     setFaceState("listening");
-    chatMutation.mutate({ sessionId, messages: requestMessages, webSearch });
+    setChatPending(true);
+    setFaceState("thinking");
+    void fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, messages: requestMessages, webSearch }),
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر إكمال الطلب الآن.");
+      setMessages((current) => [...current, { role: "assistant", content: data.reply }]);
+      setFaceState("replying");
+      window.setTimeout(() => setFaceState("idle"), 900);
+    }).catch((error: any) => {
+      setMessages((current) => [...current, { role: "assistant", content: `تعذر إكمال الطلب الآن. ${error?.message || "حاول مرة أخرى."}` }]);
+      setFaceState("idle");
+    }).finally(() => setChatPending(false));
   };
 
   return (
@@ -160,7 +157,7 @@ export default function Home() {
           </div>
           <div className="aurevion-chat-wrap">
             <div className="mb-3 flex items-center justify-between px-1"><span className="eyebrow">LIVE CONVERSATION</span><span className="flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> اتصال محمي</span></div>
-            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatMutation.isPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
+            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
           </div>
         </section>
 
