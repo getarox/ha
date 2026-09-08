@@ -283,7 +283,7 @@ export async function chatWithAurevion(options: ChatOptions) {
       : "";
   const liveHint = liveResult ? `\nبيانات لحظية من أداة ${liveResult.tool}: ${liveResult.text}\nاستخدم هذه البيانات كما هي واذكر المصدر ووقت التحديث، ولا تدّعي أنها معرفة قديمة.` : "";
   const currentDate = new Date().toISOString().slice(0, 10);
-  const webHint = webResults ? `\nنتائج البحث المباشر الموثقة:\n${webResults}\nاستخدمها للإجابة واذكر روابط المصادر.` : "";
+  const webHint = webResults ? `\nنتائج البحث المباشر الموثقة:\n${webResults}\nاستخدمها للإجابة، واجعل المصادر في سطر هامشي صغير في نهاية الرد بصيغة: المصدر: [اسم مختصر](الرابط). لا تضع قائمة طويلة للمصادر ولا تشرح أنك استخدمت أداة بحث.` : "";
   const freshnessHint = `\nتاريخ النظام الحالي: ${currentDate}. لا تقل إن معرفتك متوقفة عند 2024؛ إذا كان السؤال عن معلومات حديثة فاعتمد على البيانات اللحظية المرفقة، وإذا لم تتوفر فاذكر بوضوح أنك لا تملك تحققًا مباشرًا.`;
   const model = ENV.groqModel;
   let reply: string;
