@@ -6,7 +6,9 @@ import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCa
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 function cors(req: VercelRequest, res: VercelResponse) {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
-  if (!isAllowedAurevionOrigin(origin)) return false;
+  const host = typeof req.headers.host === "string" ? req.headers.host : "";
+  const sameOrigin = !origin || origin === `https://${host}` || origin === `http://${host}`;
+  if (!sameOrigin && !isAllowedAurevionOrigin(origin)) return false;
   if (origin) { res.setHeader("Access-Control-Allow-Origin", origin); res.setHeader("Vary", "Origin"); }
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-AUREVION-CLIENT-KEY"); res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); return true;
 }
