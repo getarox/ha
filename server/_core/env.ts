@@ -13,7 +13,7 @@ export const ENV = {
   groqModel: process.env.GROQ_MODEL ?? "openai/gpt-oss-20b",
   groqVisionModel: process.env.GROQ_VISION_MODEL ?? "qwen/qwen3.6-27b",
   groqProVisionModel: process.env.GROQ_PRO_VISION_MODEL ?? "qwen/qwen3.8-27b",
-  officialSiteUrl: process.env.AUREVION_OFFICIAL_SITE_URL ?? "https://aurevion-two.vercel.app",
+  officialSiteUrl: process.env.AUREVION_OFFICIAL_SITE_URL ?? process.env.OFFICIAL_SITE_URL ?? "https://aurevion-two.vercel.app",
   allowedOrigins: (process.env.AUREVION_ALLOWED_ORIGINS ?? "https://aurevion-two.vercel.app,http://localhost:3000").split(",").map(origin => origin.trim()).filter(Boolean),
   freeMessageLimit: Number(process.env.AUREVION_FREE_MESSAGE_LIMIT ?? (process.env.NODE_ENV === "test" ? 25 : 0)),
   proMessageLimit: Number(process.env.AUREVION_PRO_MESSAGE_LIMIT ?? 500),
