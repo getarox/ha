@@ -108,6 +108,16 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
   return { kind: "text" as const, text: payload.choices?.[0]?.message?.content ?? "لم أستطع استخراج تقييم من الصورة." };
 }
 
+async function callPollinationsImage(input: ImageStudioInput) {
+  const endpoint = ENV.pollinationsEndpoint.replace(/\/$/, "");
+  const url = `${endpoint}/${encodeURIComponent(input.prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
+  const response = await fetch(url, { headers: ENV.pollinationsApiKey ? { Authorization: `Bearer ${ENV.pollinationsApiKey}` } : {}, signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`Pollinations image request failed: ${response.status}`);
+  const mime = response.headers.get("content-type")?.split(";")[0] || "image/png";
+  const data = Buffer.from(await response.arrayBuffer()).toString("base64");
+  return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: `data:${mime};base64,${data}` };
+}
+
 export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
   if (mode === "analyze" || mode === "evaluate") return pro ? ENV.groqProVisionModel : ENV.groqVisionModel;
   return pro ? ENV.geminiProImageModel : ENV.geminiImageModel;
@@ -116,11 +126,16 @@ export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
 export async function runImageStudio(input: ImageStudioInput) {
   const quota = await consumeImageQuota(input.sessionId, Boolean(input.pro));
   const model = getImageStudioModel(input.mode, Boolean(input.pro));
-  const result = input.mode === "analyze" || input.mode === "evaluate"
-    ? await callGroqVision(input, model)
-    : await callGeminiImage(input, model);
+  let provider = "groq";
+  let result;
+  if (input.mode === "analyze" || input.mode === "evaluate") {
+    result = await callGroqVision(input, model);
+  } else {
+    try { result = await callPollinationsImage(input); provider = "pollinations"; }
+    catch (error) { console.warn("[ImageStudio] Pollinations failed; using Gemini fallback", error); result = await callGeminiImage(input, model); provider = "gemini"; }
+  }
   if (ENV.walletEnforce) {
-    try { await chargeUsage(input.sessionId, "image", input.mode === "analyze" || input.mode === "evaluate" ? "groq" : "gemini", model, randomUUID()); }
+    try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
     catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
   }
   return { ...result, plan: quota.plan, remaining: quota.remaining, model };

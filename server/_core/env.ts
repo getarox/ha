@@ -31,4 +31,7 @@ export const ENV = {
   chatPrice: process.env.AUREVION_CHAT_PRICE ?? "0.10",
   imagePrice: process.env.AUREVION_IMAGE_PRICE ?? "0.50",
   walletEnforce: process.env.AUREVION_WALLET_ENFORCE === "true",
+  pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "",
+  pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://image.pollinations.ai/prompt",
+  pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
 };
