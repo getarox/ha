@@ -1,7 +1,7 @@
 import { ENV } from "./_core/env.js";
 
 type Result = { title: string; url: string; snippet: string; source: string };
-async function get(url: string, init?: RequestInit) { const r = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) }); if (!r.ok) throw new Error(`search ${r.status}`); return r.json(); }
+async function get(url: string, init?: RequestInit) { const r = await fetch(url, { ...init, signal: AbortSignal.timeout(3500) }); if (!r.ok) throw new Error(`search ${r.status}`); return r.json(); }
 function clean(items: Result[]) { const seen = new Set<string>(); return items.filter((x) => x.url && !seen.has(x.url) && seen.add(x.url)).slice(0, 20); }
 
 async function searxng(q: string): Promise<Result[]> { if (!ENV.searxngUrl) return []; const base = ENV.searxngUrl.replace(/\/$/, ""); const d = await get(`${base}/search?q=${encodeURIComponent(q)}&format=json`); return (d.results ?? []).map((x: any) => ({ title: x.title, url: x.url, snippet: x.content ?? "", source: "SearXNG" })); }

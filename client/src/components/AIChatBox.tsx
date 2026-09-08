@@ -10,7 +10,6 @@ import {
   Code2,
   FileText,
   Flag,
-  Globe2,
   History,
   LifeBuoy,
   Loader2,
@@ -61,9 +60,6 @@ export type AIChatBoxProps = {
   height?: string | number;
   emptyStateMessage?: string;
   suggestedPrompts?: string[];
-  /** Optional externally controlled live-search state, used by Home. */
-  webSearch?: boolean;
-  onWebSearchChange?: (enabled: boolean) => void;
 };
 
 export function AIChatBox({
@@ -75,11 +71,8 @@ export function AIChatBox({
   height = "600px",
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
-  webSearch,
-  onWebSearchChange,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
-  const [localWebSearch, setLocalWebSearch] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
@@ -91,7 +84,6 @@ export function AIChatBox({
   const [voicePreset, setVoicePreset] = useState("female");
   const [voiceLoading, setVoiceLoading] = useState<number | null>(null);
   const { user, logout } = useAuth();
-  const effectiveWebSearch = webSearch ?? localWebSearch;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
@@ -304,9 +296,8 @@ export function AIChatBox({
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={() => fileInputRef.current?.click()} aria-label="إرفاق ملفات"><Paperclip className="size-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onClick={() => void handleRecordToggle()} aria-label={isRecording ? "إيقاف التسجيل" : "بدء التسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", effectiveWebSearch && "bg-cyan-300/15 text-cyan-200")} onClick={() => (onWebSearchChange ? onWebSearchChange(!effectiveWebSearch) : setLocalWebSearch((current) => !current))} aria-label="تبديل البحث المباشر" aria-pressed={effectiveWebSearch}><Globe2 className="size-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", settingsOpen && "bg-cyan-300/15 text-cyan-200")} onClick={() => setSettingsOpen((current) => !current)} aria-label="فتح الإعدادات" aria-expanded={settingsOpen}><Settings2 className="size-4" /></Button>
-        </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{effectiveWebSearch && <span className="rounded-full bg-cyan-300/10 px-2 py-1 text-cyan-200">بحث مباشر</span>}{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
+        </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
 
         {(recordingStatus || audioUrl) && <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-400"><AudioLines className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{recordingStatus || "تسجيل صوتي جاهز للإرسال"}</span>{audioUrl && <audio controls src={audioUrl} className="h-7 max-w-32" />} {audioBlob && <Button type="button" size="sm" onClick={() => void sendRecordedAudio()} disabled={isLoading} className="h-7 px-2 text-[11px]">إرسال</Button>}</div>}
 

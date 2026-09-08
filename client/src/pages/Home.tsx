@@ -53,7 +53,6 @@ function RobotFace({ state }: { state: FaceState }) {
 export default function Home() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [webSearch, setWebSearch] = useState(false);
   const [faceState, setFaceState] = useState<FaceState>("idle");
   const [sessionId] = useState(getSessionId);
   const [chatPending, setChatPending] = useState(false);
@@ -73,7 +72,7 @@ export default function Home() {
     void fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, messages: requestMessages, webSearch }),
+      body: JSON.stringify({ sessionId, messages: requestMessages, webSearch: true }),
     }).then(async (response) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر إكمال الطلب الآن.");
@@ -155,12 +154,12 @@ export default function Home() {
             </div>
             <div className="mt-10 space-y-3">
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-4"><span className="text-sm text-slate-300">رسائل الجلسة</span><span className="font-mono text-sm text-cyan-200">{messageCount}</span></div>
-              <button onClick={() => setWebSearch((value) => !value)} className={`flex w-full items-center justify-between rounded-xl border p-4 text-right transition ${webSearch ? "border-cyan-300/40 bg-cyan-300/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}><span className="flex items-center gap-3"><Globe2 className={`h-4 w-4 ${webSearch ? "text-cyan-200" : "text-slate-500"}`} /><span className="text-sm text-slate-300">بحث مباشر عند الطلب</span></span><span className={`h-5 w-9 rounded-full p-0.5 transition ${webSearch ? "bg-cyan-300" : "bg-slate-700"}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${webSearch ? "translate-x-4" : "translate-x-0"}`} /></span></button>
+              <div className="flex items-center justify-between rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4"><span className="flex items-center gap-3"><Globe2 className="h-4 w-4 text-cyan-200" /><span className="text-sm text-slate-300">بحث مباشر تلقائي</span></span><span className="text-xs text-cyan-200">مفعّل</span></div>
             </div>
           </div>
           <div className="aurevion-chat-wrap">
             <div className="mb-3 flex items-center justify-between px-1"><span className="eyebrow">LIVE CONVERSATION</span><span className="flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> اتصال محمي</span></div>
-            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} webSearch={webSearch} onWebSearchChange={setWebSearch} className="aurevion-chat" />
+            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
           </div>
         </section>
 

@@ -12,7 +12,7 @@ export async function synthesizeVoice(text: string, voiceId?: string) {
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(selected)}`, {
     method: "POST",
     headers: { "xi-api-key": ENV.elevenLabsApiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text: text.slice(0, 5000), model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.45, similarity_boost: 0.75 } }),
+    body: JSON.stringify({ text: text.slice(0, 5000), model_id: process.env.ELEVENLABS_MODEL ?? "eleven_flash_v2_5", voice_settings: { stability: 0.45, similarity_boost: 0.75 } }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error("تعذر توليد الصوت حاليًا.");

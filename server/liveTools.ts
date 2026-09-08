@@ -1,15 +1,16 @@
 type LiveResult = { tool: string; text: string };
 
-async function json(url: string) { const response = await fetch(url, { signal: AbortSignal.timeout(8_000) }); if (!response.ok) throw new Error(`live API ${response.status}`); return response.json(); }
+async function json(url: string) { const response = await fetch(url, { signal: AbortSignal.timeout(4_000) }); if (!response.ok) throw new Error(`live API ${response.status}`); return response.json(); }
 
 export async function getWeather(location: string): Promise<LiveResult> {
   const name = location.trim().replace(/[؟?!.،,].*$/, "").slice(0, 80) || "Baghdad";
   const geo = await json(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=ar&format=json`);
-  const place = geo.results?.[0];
+  const isKhanukaFallback = !geo.results?.[0] && /خانو?غة|خانو?كة|الخانو?غة|الخانو?كة/i.test(name);
+  const place = geo.results?.[0] ?? (isKhanukaFallback ? { name: "الخانوكة قرب الشرقاط", country: "العراق", latitude: 35.62, longitude: 43.20 } : undefined);
   if (!place) throw new Error("لم أجد المدينة المطلوبة للطقس.");
   const weather = await json(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto`);
   const current = weather.current;
-  return { tool: "weather", text: `بيانات الطقس اللحظية لمدينة ${place.name}، ${place.country}: الحرارة ${current.temperature_2m}°${current_units(weather).temperature_2m}، المحسوسة ${current.apparent_temperature}°، الرطوبة ${current.relative_humidity_2m}%، سرعة الرياح ${current.wind_speed_10m} كم/س. وقت القياس: ${current.time}. المصدر: Open-Meteo.` };
+  return { tool: "weather", text: `بيانات الطقس اللحظية لمنطقة ${place.name}، ${place.country}${isKhanukaFallback ? " (إحداثيات تقريبية؛ الدقة الأدق تحتاج مشاركة إحداثيات القرية من الهاتف)" : ""}: الحرارة ${current.temperature_2m}°${current_units(weather).temperature_2m}، المحسوسة ${current.apparent_temperature}°، الرطوبة ${current.relative_humidity_2m}%، سرعة الرياح ${current.wind_speed_10m} كم/س. وقت القياس: ${current.time}. المصدر: Open-Meteo.` };
 }
 function current_units(weather: any) { return weather.current_units ?? { temperature_2m: "C" }; }
 
