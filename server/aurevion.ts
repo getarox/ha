@@ -255,7 +255,7 @@ export async function chatWithAurevion(options: ChatOptions) {
   }
 
   const limit = state.plan === "pro" ? ENV.proMessageLimit : ENV.freeMessageLimit;
-  if (state.messagesUsed >= limit) {
+  if (limit > 0 && state.messagesUsed >= limit) {
     throw new TRPCError({ code: "FORBIDDEN", message: "انتهت حصة هذه الجلسة. اختر خطة أعلى لمتابعة المحادثة." });
   }
 
@@ -306,7 +306,7 @@ export async function chatWithAurevion(options: ChatOptions) {
     model: usedModel,
     searched: Boolean(webResults),
     plan: state.plan,
-    remaining: Math.max(0, limit - state.messagesUsed),
+    remaining: limit > 0 ? Math.max(0, limit - state.messagesUsed) : null,
   };
 }
 

@@ -88,6 +88,7 @@ export function AIChatBox({
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const voiceCallTimerRef = useRef<number | null>(null);
   const { user, logout } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +134,7 @@ export function AIChatBox({
       recorderRef.current?.stop();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       speechRef.current?.stop();
+      if (voiceCallTimerRef.current) window.clearTimeout(voiceCallTimerRef.current);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
@@ -199,7 +201,7 @@ export function AIChatBox({
     }
     const recognition = new SpeechRecognition();
     let capturedTranscript = "";
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = document.documentElement.lang || "ar-SA";
     recognition.onresult = (event) => {
@@ -209,6 +211,7 @@ export function AIChatBox({
     };
     recognition.onend = () => {
       setIsVoiceChatting(false);
+      if (voiceCallTimerRef.current) window.clearTimeout(voiceCallTimerRef.current);
       if (capturedTranscript) { onSendMessage(capturedTranscript); setInput(""); setRecordingStatus("أرسلت رسالتك الصوتية، انتظر الرد الصوتي."); }
       else setRecordingStatus("لم ألتقط كلامًا واضحًا.");
     };
@@ -220,7 +223,8 @@ export function AIChatBox({
     try {
       recognition.start();
       setIsVoiceChatting(true);
-      setRecordingStatus("أستمع الآن… تحدث بوضوح.");
+      setRecordingStatus("محادثة صوتية مباشرة — الحد الأقصى 5 دقائق.");
+      voiceCallTimerRef.current = window.setTimeout(() => { recognition.stop(); setRecordingStatus("انتهت مدة المحادثة الصوتية المجانية (5 دقائق)."); }, 5 * 60 * 1000);
     } catch {
       setIsVoiceChatting(false);
       setRecordingStatus("تعذر بدء المحادثة الصوتية.");
@@ -331,7 +335,7 @@ export function AIChatBox({
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={() => fileInputRef.current?.click()} aria-label="إرفاق ملفات"><Paperclip className="size-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onClick={() => void handleRecordToggle()} aria-label={isRecording ? "إيقاف التسجيل" : "بدء التسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
-          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية لمدة خمس دقائق" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", settingsOpen && "bg-cyan-300/15 text-cyan-200")} onClick={() => setSettingsOpen((current) => !current)} aria-label="فتح الإعدادات" aria-expanded={settingsOpen}><Settings2 className="size-4" /></Button>
         </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
 
