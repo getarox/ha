@@ -157,7 +157,7 @@ export default function Home() {
           </div>
           <div className="aurevion-chat-wrap">
             <div className="mb-3 flex items-center justify-between px-1"><span className="eyebrow">LIVE CONVERSATION</span><span className="flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> اتصال محمي</span></div>
-            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} className="aurevion-chat" />
+            <AIChatBox messages={messages} onSendMessage={handleSend} isLoading={chatPending} height="520px" placeholder="اكتب لأوريفون أي شيء..." emptyStateMessage="ابدأ محادثة مع العقل الروبوتي" suggestedPrompts={["من أنت؟", "ساعدني أخطط لمشروعي", "أنا أشعر بالحزن اليوم"]} webSearch={webSearch} onWebSearchChange={setWebSearch} className="aurevion-chat" />
           </div>
         </section>
 
