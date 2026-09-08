@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "node:crypto";
 import { ENV } from "./_core/env.js";
 import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db.js";
+import { chargeUsage } from "./billing.js";
 
 export type ImageStudioMode = "generate" | "edit" | "analyze" | "evaluate";
 
@@ -117,5 +119,9 @@ export async function runImageStudio(input: ImageStudioInput) {
   const result = input.mode === "analyze" || input.mode === "evaluate"
     ? await callGroqVision(input, model)
     : await callGeminiImage(input, model);
+  if (ENV.walletEnforce) {
+    try { await chargeUsage(input.sessionId, "image", input.mode === "analyze" || input.mode === "evaluate" ? "groq" : "gemini", model, randomUUID()); }
+    catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
+  }
   return { ...result, plan: quota.plan, remaining: quota.remaining, model };
 }

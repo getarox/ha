@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(await chatWithAurevion(body));
   } catch (error: any) {
     const code = error?.code;
-    const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PRECONDITION_FAILED" ? 503 : 502;
+    const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : 502;
     return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." });
   }
 }

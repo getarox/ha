@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./_core/env.js";
 import {
@@ -8,6 +9,7 @@ import {
   setAurevionSessionPlan,
   updateAurevionSession,
 } from "./db.js";
+import { chargeUsage } from "./billing.js";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type StoredContext = ChatMessage[];
@@ -292,6 +294,10 @@ export async function chatWithAurevion(options: ChatOptions) {
     }
   }
 
+  if (ENV.walletEnforce) {
+    try { await chargeUsage(sessionKey, "chat", "groq", usedModel, randomUUID()); }
+    catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
+  }
   state.messagesUsed += 1;
   await persistSessionState(state, sessionKey, [...context, { role: "assistant", content: reply }]);
 

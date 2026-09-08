@@ -30,4 +30,5 @@ export const ENV = {
   walletCurrency: process.env.WALLET_CURRENCY ?? "SAR",
   chatPrice: process.env.AUREVION_CHAT_PRICE ?? "0.10",
   imagePrice: process.env.AUREVION_IMAGE_PRICE ?? "0.50",
+  walletEnforce: process.env.AUREVION_WALLET_ENFORCE === "true",
 };
