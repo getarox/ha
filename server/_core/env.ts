@@ -22,4 +22,12 @@ export const ENV = {
   geminiProImageModel: process.env.GEMINI_PRO_IMAGE_MODEL ?? "gemini-3-pro-image",
   freeImageLimit: Number(process.env.AUREVION_FREE_IMAGE_LIMIT ?? 3),
   proImageLimit: Number(process.env.AUREVION_PRO_IMAGE_LIMIT ?? 100),
+  paytabsProfileId: process.env.PAYTABS_PROFILE_ID ?? "",
+  paytabsServerKey: process.env.PAYTABS_SERVER_KEY ?? "",
+  paytabsEndpoint: process.env.PAYTABS_ENDPOINT ?? "https://secure.paytabs.com",
+  paytabsCallbackUrl: process.env.PAYTABS_CALLBACK_URL ?? "",
+  paytabsReturnUrl: process.env.PAYTABS_RETURN_URL ?? "",
+  walletCurrency: process.env.WALLET_CURRENCY ?? "SAR",
+  chatPrice: process.env.AUREVION_CHAT_PRICE ?? "0.10",
+  imagePrice: process.env.AUREVION_IMAGE_PRICE ?? "0.50",
 };
