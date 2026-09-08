@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { chatWithAurevion, isAllowedAurevionOrigin, isAuthorizedAurevionClient } from "./aurevion.js";
 import { runImageStudio } from "./imageStudio.js";
 import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCallback } from "./billing.js";
+import { synthesizeVoice } from "./voice.js";
 
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 function cors(req: VercelRequest, res: VercelResponse) {
@@ -33,3 +34,12 @@ export async function paymentCreate(req: VercelRequest, res: VercelResponse) { i
 function raw(req: VercelRequest) { const body = (req as any).rawBody; return Buffer.isBuffer(body) ? body.toString("utf8") : typeof body === "string" ? body : JSON.stringify(req.body ?? {}); }
 export async function paymentCallback(req: VercelRequest, res: VercelResponse) { if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const sig = req.headers.signature ?? req.headers["x-signature"]; const signature = Array.isArray(sig) ? sig[0] : sig; if (!verifyPayTabsCallback(raw(req), signature)) return res.status(401).json({ error: "توقيع PayTabs غير صالح." }); try { return res.status(200).json(await settlePayTabsCallback(req.body ?? {})); } catch (e: any) { return res.status(400).json({ error: e?.message ?? "تعذر معالجة callback." }); } }
 export async function paymentReturn(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, message: "تم استلام نتيجة الدفع. سيتم تحديث الرصيد عبر callback الآمن." }); }
+export async function voice(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  const body = req.body ?? {};
+  if (typeof body.text !== "string" || !body.text.trim()) return res.status(400).json({ error: "النص الصوتي مطلوب." });
+  const voiceId = body.voiceId === "male" || body.voiceId === "calm" || body.voiceId === "female" ? undefined : typeof body.voiceId === "string" ? body.voiceId : undefined;
+  const preset = body.voiceId === "male" || body.voiceId === "calm" || body.voiceId === "female" ? body.voiceId : undefined;
+  try { return res.status(200).json(await synthesizeVoice(body.text, preset ?? voiceId)); }
+  catch (error: any) { return res.status(502).json({ error: error?.message ?? "تعذر توليد الصوت حاليًا." }); }
+}

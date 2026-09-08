@@ -34,4 +34,5 @@ export const ENV = {
   pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "",
   pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://image.pollinations.ai/prompt",
   pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
+  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
 };

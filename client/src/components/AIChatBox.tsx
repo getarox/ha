@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   AudioLines,
+  Volume2,
   Code2,
   FileText,
   Flag,
@@ -86,6 +87,8 @@ export function AIChatBox({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [voicePreset, setVoicePreset] = useState("female");
+  const [voiceLoading, setVoiceLoading] = useState<number | null>(null);
   const { user, logout } = useAuth();
   const effectiveWebSearch = webSearch ?? localWebSearch;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -224,6 +227,17 @@ export function AIChatBox({
     }
   };
 
+  const playAssistantVoice = async (text: string, index: number) => {
+    setVoiceLoading(index);
+    try {
+      const response = await fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voiceId: voicePreset }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "تعذر توليد الصوت.");
+      await new Audio(`data:${data.contentType};base64,${data.audioBase64}`).play();
+    } catch (error: any) { setRecordingStatus(error?.message || "تعذر تشغيل الصوت."); }
+    finally { setVoiceLoading(null); }
+  };
+
   return (
     <div ref={containerRef} className={cn("flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm", className)} style={{ height }}>
       <div ref={scrollAreaRef} className="flex-1 overflow-hidden">
@@ -241,7 +255,7 @@ export function AIChatBox({
               const shouldApplyMinHeight = isLastMessage && !isLoading && minHeightForLastMessage > 0;
               return <div key={index} className={cn("flex items-start gap-3", message.role === "user" ? "justify-end" : "justify-start")} style={shouldApplyMinHeight ? { minHeight: `${minHeightForLastMessage}px` } : undefined}>
                 {message.role === "assistant" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10"><Sparkles className="size-4 text-primary" /></div>}
-                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
+                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <><div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div><button type="button" onClick={() => void playAssistantVoice(message.content, index)} disabled={voiceLoading === index} className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-100">{voiceLoading === index ? <Loader2 className="size-3 animate-spin" /> : <Volume2 className="size-3" />} استمع</button></> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
                 {message.role === "user" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary"><User className="size-4 text-secondary-foreground" /></div>}
               </div>;
             })}
@@ -261,6 +275,7 @@ export function AIChatBox({
             <a href="#plans" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/[0.07]"><FileText className="size-4 text-cyan-300" /><span>الخطط</span></a>
             <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => setDeveloperMode((current) => !current)}><Code2 className="size-4 text-cyan-300" /><span className="flex-1">وضع Developer</span><span className={cn("h-5 w-9 rounded-full p-0.5 transition", developerMode ? "bg-cyan-300" : "bg-slate-700")}><span className={cn("block size-4 rounded-full bg-white transition", developerMode ? "translate-x-4" : "translate-x-0")} /></span></button>
           </div>
+          <label className="mt-2 flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-xs"><span>نبرة الرد الصوتي</span><select value={voicePreset} onChange={(event) => setVoicePreset(event.target.value)} className="rounded bg-slate-800 px-2 py-1 text-xs"><option value="female">أنثى</option><option value="male">ذكر</option><option value="calm">هادئ</option></select></label>
           {developerMode && <p className="mt-2 rounded-lg bg-cyan-300/10 px-3 py-2 text-[11px] leading-5 text-cyan-100">وضع المطور مفعل محليًا. لا يتم إرسال أي مفاتيح أو بيانات إضافية.</p>}
         </div>}
 

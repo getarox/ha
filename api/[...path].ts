@@ -7,6 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" });
   }
   const handlers = await import("../server/httpHandlers.js");
+  if (path === "/api/voice") return handlers.voice(req, res);
   if (path === "/api/chat") return handlers.chat(req, res);
   if (path === "/api/image") return handlers.image(req, res);
   if (path === "/api/wallet") return handlers.wallet(req, res);
