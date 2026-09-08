@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { AurevionSession, InsertUser, aurevionSessions, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import mysql from "mysql2";
+import { AurevionSession, InsertUser, aurevionSessions, users } from "../drizzle/schema.js";
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -9,7 +10,16 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const u = new URL(process.env.DATABASE_URL);
+      const client = await mysql.createPool({
+        host: u.hostname,
+        port: Number(u.port || 4000),
+        user: decodeURIComponent(u.username),
+        password: decodeURIComponent(u.password),
+        database: decodeURIComponent(u.pathname.slice(1)),
+        ssl: { rejectUnauthorized: true },
+      });
+      _db = drizzle({ client });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

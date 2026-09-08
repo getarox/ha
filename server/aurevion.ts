@@ -1,13 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./_core/env";
+import { ENV } from "./_core/env.js";
 import {
   createAurevionSession,
   getAurevionSession,
   getAurevionSessionStats,
   setAurevionSessionPlan,
   updateAurevionSession,
-} from "./db";
+} from "./db.js";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type StoredContext = ChatMessage[];

@@ -1,16 +1,5 @@
 {
-  "version": 2,
-  "buildCommand": "pnpm run build",
-  "functions": {
-    "api/chat.ts": {
-      "runtime": "@vercel/node@5.0.0",
-      "includeFiles": [
-        "server/**",
-        "shared/**"
-      ]
-    },
-    "api/health.ts": {
-      "runtime": "@vercel/node@5.0.0"
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public"
 }

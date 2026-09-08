@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./_core/env";
-import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db";
+import { ENV } from "./_core/env.js";
+import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db.js";
 
 export type ImageStudioMode = "generate" | "edit" | "analyze" | "evaluate";
 
