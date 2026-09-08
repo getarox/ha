@@ -78,6 +78,9 @@ export default function Home() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر إكمال الطلب الآن.");
       setMessages((current) => [...current, { role: "assistant", content: data.reply }]);
+      void fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: data.reply, voiceId: "female" }) })
+        .then(async (voiceResponse) => { if (!voiceResponse.ok) return; const voice = await voiceResponse.json(); await new Audio(`data:${voice.contentType};base64,${voice.audioBase64}`).play(); })
+        .catch(() => undefined);
       setFaceState("replying");
       window.setTimeout(() => setFaceState("idle"), 900);
     }).catch((error: any) => {

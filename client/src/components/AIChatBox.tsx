@@ -179,17 +179,19 @@ export function AIChatBox({
       return;
     }
     const recognition = new SpeechRecognition();
+    let capturedTranscript = "";
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = document.documentElement.lang || "ar-SA";
     recognition.onresult = (event) => {
       const lastResult = event.results[event.results.length - 1];
       const transcript = lastResult?.[0]?.transcript?.trim();
-      if (transcript) setInput((current) => `${current} ${transcript}`.trim());
+      if (transcript) { capturedTranscript = transcript; setInput((current) => `${current} ${transcript}`.trim()); }
     };
     recognition.onend = () => {
       setIsVoiceChatting(false);
-      setRecordingStatus("تم تحويل صوتك إلى نص. راجعه ثم أرسله عندما تكون جاهزًا.");
+      if (capturedTranscript) { onSendMessage(capturedTranscript); setInput(""); setRecordingStatus("أرسلت رسالتك الصوتية، انتظر الرد الصوتي."); }
+      else setRecordingStatus("لم ألتقط كلامًا واضحًا.");
     };
     recognition.onerror = () => {
       setIsVoiceChatting(false);
