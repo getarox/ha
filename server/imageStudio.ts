@@ -134,7 +134,8 @@ export async function runImageStudio(input: ImageStudioInput) {
     try { result = await callPollinationsImage(input); provider = "pollinations"; }
     catch (error) { console.warn("[ImageStudio] Pollinations failed; using Gemini fallback", error); result = await callGeminiImage(input, model); provider = "gemini"; }
   }
-  if (ENV.walletEnforce) {
+  const isHeavyTask = input.mode !== "generate" || Boolean(input.pro);
+  if ((ENV.walletEnforce || isHeavyTask) && process.env.NODE_ENV !== "test") {
     try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
     catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
   }
