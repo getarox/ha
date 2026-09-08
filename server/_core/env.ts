@@ -35,4 +35,10 @@ export const ENV = {
   pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://image.pollinations.ai/prompt",
   pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
+  googleApiKey: process.env.GOOGLE_API_KEY ?? "",
+  googleSearchCx: process.env.GOOGLE_SEARCH_CX ?? "",
+  braveApiKey: process.env.BRAVE_SEARCH_API_KEY ?? process.env.BING_API_KEY ?? "",
+  searxngUrl: process.env.SEARXNG_URL ?? "",
+  yandexApiKey: process.env.YANDEX_API_KEY ?? "",
+  yandexUser: process.env.YANDEX_USER ?? "",
 };

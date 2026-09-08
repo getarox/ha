@@ -9,6 +9,7 @@ import {
   updateAurevionSession,
 } from "./db.js";
 import { getLiveContext } from "./liveTools.js";
+import { formatSearchContext, searchWeb } from "./searchEngines.js";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type StoredContext = ChatMessage[];
@@ -269,18 +270,24 @@ export async function chatWithAurevion(options: ChatOptions) {
   let liveResult: { tool: string; text: string } | null = null;
   try { liveResult = await getLiveContext(latestUserMessage.content); }
   catch (error) { console.warn("[AUREVION] Live tool unavailable:", error); }
+  let webResults = "";
+  if (options.webSearch) {
+    try { webResults = formatSearchContext(await searchWeb(latestUserMessage.content)); }
+    catch (error) { console.warn("[AUREVION] Web search unavailable:", error); }
+  }
   const brainHint = pythonResult?.handled
     ? `\nنتيجة طبقة العقل المحلي: ${pythonResult.reply ?? "تم تنفيذ الإجراء المحلي."}${pythonResult.action ? ` (action=${pythonResult.action})` : ""}. أجب للمستخدم أنت عبر Groq مع توضيح النتيجة.`
     : pythonResult?.tool
       ? `\nحدد العقل المحلي الأداة المطلوبة: ${pythonResult.tool}. إن لم تتوفر نتيجة الأداة، صرّح بذلك ولا تخترع بيانات.`
       : "";
   const liveHint = liveResult ? `\nبيانات لحظية من أداة ${liveResult.tool}: ${liveResult.text}\nاستخدم هذه البيانات كما هي واذكر المصدر ووقت التحديث، ولا تدّعي أنها معرفة قديمة.` : "";
+  const webHint = webResults ? `\nنتائج البحث المباشر الموثقة:\n${webResults}\nاستخدمها للإجابة واذكر روابط المصادر.` : "";
   const model = options.webSearch ? "groq/compound-mini" : ENV.groqModel;
   let reply: string;
   let usedModel = model;
   try {
     reply = await callGroq(model, [
-      { role: "system", content: `${IDENTITY_PROMPT}${brainHint}${liveHint}` },
+      { role: "system", content: `${IDENTITY_PROMPT}${brainHint}${liveHint}${webHint}` },
       ...context,
     ]);
   } catch (error) {
@@ -288,7 +295,7 @@ export async function chatWithAurevion(options: ChatOptions) {
     if (options.webSearch && (status === 400 || status === 404)) {
       usedModel = ENV.groqModel;
       reply = await callGroq(ENV.groqModel, [
-        { role: "system", content: `${IDENTITY_PROMPT}${liveHint}\nلم تتوفر أداة البحث في هذه المحاولة؛ أجب من معرفتك وصرّح بأنك لم تبحث.` },
+        { role: "system", content: `${IDENTITY_PROMPT}${liveHint}${webHint}\nلم تتوفر أداة البحث في هذه المحاولة؛ أجب من معرفتك وصرّح بأنك لم تبحث.` },
         ...context,
       ]);
     } else {
