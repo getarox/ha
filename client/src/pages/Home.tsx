@@ -65,6 +65,11 @@ export default function Home() {
       (message): message is { role: "user" | "assistant"; content: string } => message.role !== "system",
     );
     setMessages(nextMessages);
+    try {
+      const history = JSON.parse(localStorage.getItem("aurevion-session-history") || "[]") as Array<{ title: string; date: string; count: number }>;
+      const nextHistory = [{ title: content.slice(0, 80), date: new Date().toISOString(), count: requestMessages.length }, ...history].slice(0, 20);
+      localStorage.setItem("aurevion-session-history", JSON.stringify(nextHistory));
+    } catch { /* local history is optional */ }
     setFaceState("listening");
     setChatPending(true);
     setFaceState("thinking");
@@ -106,6 +111,7 @@ export default function Home() {
           <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع الرسمي <ArrowUpRight className="h-3.5 w-3.5" /></a>
         </nav>
         <div className="flex items-center gap-2">
+          <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
           {user?.role === "admin" ? <Link href="/owner" className="hidden sm:block"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">لوحة المالك</Button></Link> : null}
           {!user ? <Button onClick={() => startLogin()} className="hidden bg-cyan-300 text-slate-950 hover:bg-cyan-200 sm:inline-flex">دخول المالك</Button> : null}
           <Button variant="ghost" size="icon" className="text-slate-300 md:hidden" aria-label="فتح القائمة"><Menu className="h-5 w-5" /></Button>

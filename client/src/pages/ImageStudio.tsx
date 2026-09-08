@@ -15,7 +15,6 @@ export default function ImageStudio() {
   const [prompt, setPrompt] = useState("");
   const [imageBase64, setImageBase64] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
-  const [pro, setPro] = useState(false);
   const [sessionId] = useState(() => `studio-${crypto.randomUUID()}`);
   const inputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<any>();
@@ -37,7 +36,7 @@ export default function ImageStudio() {
     if (!prompt.trim() || pending) return;
     setPending(true); setError(undefined);
     try {
-      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt: prompt.trim(), imageBase64, pro }) });
+      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt: prompt.trim(), imageBase64, pro: false }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر تنفيذ عملية الصور.");
       setResult(data);
@@ -75,14 +74,14 @@ export default function ImageStudio() {
               {previewUrl && <img src={previewUrl} alt="الصورة المرجعية" className="mt-4 max-h-56 w-full rounded-xl object-contain" />}
             </div>
 
-            <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm text-slate-300"><input type="checkbox" checked={pro} onChange={(event) => setPro(event.target.checked)} className="h-4 w-4 accent-cyan-300" /> استخدام وضع Banana Pro <span className="mr-auto text-xs text-amber-200">لخطة Pro</span></label>
-            <Button onClick={handleSubmit} disabled={pending || !prompt.trim() || (needsImage && !imageBase64)} className="mt-5 h-12 w-full bg-cyan-300 text-base font-semibold text-slate-950 hover:bg-cyan-200">{pending ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ التنفيذ...</> : <><Sparkles className="ml-2 h-4 w-4" /> تنفيذ العملية</>}</Button>
+            <p className="mt-5 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3 text-xs leading-6 text-cyan-100">الإنشاء يبدأ عبر Pollinations AI. إذا تعذر، ينتقل تلقائيًا إلى Gemini كاحتياطي. المهام الثقيلة فقط قد تحتاج رصيدًا من الخطط.</p>
+            <Button onClick={handleSubmit} disabled={pending || !prompt.trim() || (needsImage && !imageBase64)} className="mt-3 h-12 w-full bg-cyan-300 text-base font-semibold text-slate-950 hover:bg-cyan-200">{pending ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ التنفيذ...</> : <><Sparkles className="ml-2 h-4 w-4" /> إنشاء الصورة</>}</Button>
             {error && <p className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{error}</p>}
           </div>
 
           <div className="rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-300/[0.08] to-transparent p-5 sm:p-7">
             <div className="flex items-center gap-3"><ImagePlus className="h-5 w-5 text-cyan-200" /><h2 className="text-xl font-medium">نتيجة أوريفون</h2></div>
-            {!result && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب طلبًا واضحًا، واختر العملية المناسبة. في وضع Pro تحصل على نموذج Banana Pro عند تفعيل خطتك.</p></div>}
+            {!result && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب وصفًا واضحًا وستُنشأ الصورة أولًا عبر Pollinations AI.</p></div>}
             {result && <div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{result.text}</div>{result.kind === "image" && result.imageDataUrl && <img src={result.imageDataUrl} alt="نتيجة مولدة من أوريفون" className="w-full rounded-2xl border border-white/10 object-contain" />}<div className="flex items-center justify-between text-xs text-slate-500"><span>النموذج: {result.model}</span><span>المتبقي: {result.remaining}</span></div></div>}
           </div>
         </section>

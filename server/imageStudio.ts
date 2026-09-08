@@ -138,5 +138,5 @@ export async function runImageStudio(input: ImageStudioInput) {
     try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
     catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
   }
-  return { ...result, plan: quota.plan, remaining: quota.remaining, model };
+  return { ...result, provider, plan: quota.plan, remaining: quota.remaining, model: provider === "pollinations" ? "pollinations.ai" : model };
 }
