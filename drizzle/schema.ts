@@ -6,12 +6,7 @@ import { decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "d
  * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -93,5 +88,18 @@ export const pricing = mysqlTable("pricing", {
   active: int("active").default(1).notNull(),
 });
 
+export const aurevionFeedback = mysqlTable("aurevion_feedback", {
+  id: int("id").autoincrement().primaryKey(),
+  category: mysqlEnum("category", ["support", "bug", "safety", "feedback"]).notNull(),
+  message: text("message").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }),
+  userEmail: varchar("userEmail", { length: 320 }),
+  status: mysqlEnum("status", ["new", "reviewing", "resolved"]).default("new").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type Wallet = typeof wallets.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type AurevionFeedback = typeof aurevionFeedback.$inferSelect;
+export type InsertAurevionFeedback = typeof aurevionFeedback.$inferInsert;

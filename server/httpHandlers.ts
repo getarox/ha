@@ -4,6 +4,7 @@ import { runImageStudio } from "./imageStudio.js";
 import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCallback } from "./billing.js";
 import { synthesizeVoice } from "./voice.js";
 import { transcribeAudio } from "./transcribe.js";
+import { createAurevionFeedback } from "./db.js";
 
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 function cors(req: VercelRequest, res: VercelResponse) {
@@ -50,4 +51,29 @@ export async function transcribe(req: VercelRequest, res: VercelResponse) {
   if (typeof body.audioBase64 !== "string") return res.status(400).json({ error: "التسجيل الصوتي مطلوب." });
   try { return res.status(200).json(await transcribeAudio(body.audioBase64, typeof body.mimeType === "string" ? body.mimeType : "audio/webm")); }
   catch (error: any) { return res.status(502).json({ error: error?.message ?? "تعذر تحويل التسجيل إلى نص." }); }
+}
+
+export async function feedback(req: VercelRequest, res: VercelResponse) {
+  if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." });
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  const body = req.body ?? {};
+  const category = body.category;
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!["support", "bug", "safety", "feedback"].includes(category) || message.length < 3 || message.length > 10000) {
+    return res.status(400).json({ error: "نوع البلاغ أو نصه غير صالح." });
+  }
+  try {
+    const saved = await createAurevionFeedback({
+      category,
+      message,
+      sessionId: typeof body.sessionId === "string" ? body.sessionId.slice(0, 128) : null,
+      userEmail: typeof body.userEmail === "string" ? body.userEmail.slice(0, 320) : null,
+    });
+    return res.status(201).json({ ok: true, ...saved, message: "تم استلام البلاغ وسيتم التعامل معه." });
+  } catch (error: any) {
+    if (error?.message === "DATABASE_UNAVAILABLE") return res.status(503).json({ error: "خدمة العملاء غير متصلة بقاعدة البيانات حاليًا." });
+    console.error("[Feedback] Failed to save feedback:", error);
+    return res.status(503).json({ error: "تعذر حفظ البلاغ حاليًا. حاول مرة أخرى." });
+  }
 }

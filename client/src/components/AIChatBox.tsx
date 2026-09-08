@@ -83,6 +83,10 @@ export function AIChatBox({
   const [developerMode, setDeveloperMode] = useState(false);
   const [voicePreset, setVoicePreset] = useState("female");
   const [voiceLoading, setVoiceLoading] = useState<number | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<"support" | "bug">("support");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
   const { user, logout } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,6 +99,26 @@ export function AIChatBox({
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
   const displayMessages = messages.filter((msg) => msg.role !== "system");
   const [minHeightForLastMessage, setMinHeightForLastMessage] = useState(0);
+  const submitFeedback = async () => {
+    if (feedbackMessage.trim().length < 3 || feedbackSending) return;
+    setFeedbackSending(true);
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: feedbackCategory, message: feedbackMessage.trim(), sessionId: localStorage.getItem("aurevion_session_id") }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "تعذر إرسال البلاغ.");
+      setFeedbackMessage("");
+      setFeedbackOpen(false);
+      setRecordingStatus(data.message || "تم استلام البلاغ.");
+    } catch (error: any) {
+      setRecordingStatus(error?.message || "تعذر إرسال البلاغ.");
+    } finally {
+      setFeedbackSending(false);
+    }
+  };
 
   useEffect(() => {
     if (containerRef.current && inputAreaRef.current) {
@@ -277,13 +301,19 @@ export function AIChatBox({
       </div>
 
       <form ref={inputAreaRef} onSubmit={handleSubmit} className="relative flex flex-col gap-3 border-t bg-background/50 p-4">
+        {feedbackOpen && <div className="absolute bottom-[calc(100%+0.75rem)] end-4 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-4 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl">
+          <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-semibold">خدمة العملاء</p><p className="mt-1 text-[11px] text-slate-500">يرسل طلبك مباشرة إلى فريق AUREVION</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => setFeedbackOpen(false)} aria-label="إغلاق"><X className="size-4" /></Button></div>
+          <div className="mb-3 flex gap-2"><button type="button" onClick={() => setFeedbackCategory("support")} className={cn("rounded-lg px-3 py-1.5 text-xs", feedbackCategory === "support" ? "bg-cyan-300 text-slate-950" : "bg-white/10")}>دعم</button><button type="button" onClick={() => setFeedbackCategory("bug")} className={cn("rounded-lg px-3 py-1.5 text-xs", feedbackCategory === "bug" ? "bg-cyan-300 text-slate-950" : "bg-white/10")}>إبلاغ عن مشكلة</button></div>
+          <textarea value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="اكتب طلبك أو تفاصيل المشكلة..." className="min-h-24 w-full resize-y rounded-lg border border-white/10 bg-white/5 p-3 text-sm outline-none focus:border-cyan-300/50" />
+          <Button type="button" onClick={() => void submitFeedback()} disabled={feedbackSending || feedbackMessage.trim().length < 3} className="mt-3 w-full">{feedbackSending ? <Loader2 className="size-4 animate-spin" /> : "إرسال إلى خدمة العملاء"}</Button>
+        </div>}
         {settingsOpen && <div className="absolute bottom-[calc(100%+0.75rem)] end-4 z-20 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-3 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl">
           <div className="mb-2 flex items-center justify-between border-b border-white/10 px-2 pb-3"><div><p className="text-sm font-semibold">إعدادات المحادثة</p><p className="mt-1 text-[11px] text-slate-500">تحكم سريع في تجربتك</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white" onClick={() => setSettingsOpen(false)} aria-label="إغلاق الإعدادات"><X className="size-4" /></Button></div>
           <div className="space-y-1">
             <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => setRecordingStatus("سيظهر سجل هذه الجلسة هنا قريبًا — رسائلك الحالية محفوظة محليًا.")}><History className="size-4 text-cyan-300" /><span className="flex-1">History</span><span className="text-[10px] text-slate-500">الجلسة الحالية</span></button>
             {user ? <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => void logout()}><LogOut className="size-4 text-cyan-300" /><span>تسجيل الخروج</span><span className="ms-auto max-w-24 truncate text-[10px] text-slate-500">{user.name || "الحساب"}</span></button> : <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => startLogin()}><LogIn className="size-4 text-cyan-300" /><span>تسجيل الدخول</span></button>}
-            <a href="mailto:support@aurevion.ai" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/[0.07]"><LifeBuoy className="size-4 text-cyan-300" /><span>الدعم</span></a>
-            <a href="mailto:report@aurevion.ai?subject=Aurevion%20report" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/[0.07]"><Flag className="size-4 text-cyan-300" /><span>الإبلاغ عن مشكلة</span></a>
+            <button type="button" onClick={() => { setFeedbackCategory("support"); setFeedbackOpen(true); setSettingsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-right transition hover:bg-white/[0.07]"><LifeBuoy className="size-4 text-cyan-300" /><span>الدعم</span></button>
+            <button type="button" onClick={() => { setFeedbackCategory("bug"); setFeedbackOpen(true); setSettingsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-right transition hover:bg-white/[0.07]"><Flag className="size-4 text-cyan-300" /><span>الإبلاغ عن مشكلة</span></button>
             <a href="#plans" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/[0.07]"><FileText className="size-4 text-cyan-300" /><span>الخطط</span></a>
             <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => setDeveloperMode((current) => !current)}><Code2 className="size-4 text-cyan-300" /><span className="flex-1">وضع Developer</span><span className={cn("h-5 w-9 rounded-full p-0.5 transition", developerMode ? "bg-cyan-300" : "bg-slate-700")}><span className={cn("block size-4 rounded-full bg-white transition", developerMode ? "translate-x-4" : "translate-x-0")} /></span></button>
           </div>

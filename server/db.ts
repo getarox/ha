@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2";
-import { AurevionSession, InsertUser, aurevionSessions, users } from "../drizzle/schema.js";
+import { AurevionSession, InsertAurevionFeedback, InsertUser, aurevionFeedback, aurevionSessions, users } from "../drizzle/schema.js";
 import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -139,6 +139,13 @@ export async function getAurevionSessionStats() {
     proSessions: rows.filter(row => row.plan === "pro").length,
     totalMessages: rows.reduce((total, row) => total + row.messagesUsed, 0),
   };
+}
+
+export async function createAurevionFeedback(values: InsertAurevionFeedback) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_UNAVAILABLE");
+  const result = await db.insert(aurevionFeedback).values(values);
+  return { id: Number(result[0].insertId), status: values.status ?? "new" };
 }
 
 // TODO: add feature queries here as your schema grows.
