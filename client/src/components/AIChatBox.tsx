@@ -85,6 +85,7 @@ export function AIChatBox({
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
   const [voicePreset, setVoicePreset] = useState("female");
@@ -153,6 +154,7 @@ export function AIChatBox({
       };
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setAudioBlob(blob);
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioUrl(URL.createObjectURL(blob));
         setIsRecording(false);
@@ -229,6 +231,22 @@ export function AIChatBox({
     }
   };
 
+  const sendRecordedAudio = async () => {
+    if (!audioBlob || isLoading) return;
+    setRecordingStatus("جارٍ تحويل التسجيل إلى نص…");
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const encoded = String(reader.result).split(",")[1] ?? "";
+        const response = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioBase64: encoded, mimeType: audioBlob.type }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "تعذر تحويل التسجيل إلى نص.");
+        if (data.text) { onSendMessage(data.text); setAudioBlob(null); setAudioUrl(null); setRecordingStatus("تم إرسال التسجيل."); }
+      } catch (error: any) { setRecordingStatus(error?.message || "تعذر إرسال التسجيل."); }
+    };
+    reader.readAsDataURL(audioBlob);
+  };
+
   const playAssistantVoice = async (text: string, index: number) => {
     setVoiceLoading(index);
     try {
@@ -290,7 +308,7 @@ export function AIChatBox({
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", settingsOpen && "bg-cyan-300/15 text-cyan-200")} onClick={() => setSettingsOpen((current) => !current)} aria-label="فتح الإعدادات" aria-expanded={settingsOpen}><Settings2 className="size-4" /></Button>
         </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{effectiveWebSearch && <span className="rounded-full bg-cyan-300/10 px-2 py-1 text-cyan-200">بحث مباشر</span>}{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
 
-        {(recordingStatus || audioUrl) && <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-400"><AudioLines className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{recordingStatus || "تسجيل صوتي محلي"}</span>{audioUrl && <audio controls src={audioUrl} className="h-7 max-w-32" />}</div>}
+        {(recordingStatus || audioUrl) && <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-400"><AudioLines className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{recordingStatus || "تسجيل صوتي جاهز للإرسال"}</span>{audioUrl && <audio controls src={audioUrl} className="h-7 max-w-32" />} {audioBlob && <Button type="button" size="sm" onClick={() => void sendRecordedAudio()} disabled={isLoading} className="h-7 px-2 text-[11px]">إرسال</Button>}</div>}
 
         <div className="flex items-end gap-2"><Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder={placeholder} className="min-h-9 max-h-32 flex-1 resize-none" rows={1} /><Button type="submit" size="icon" disabled={(!input.trim() && selectedFiles.length === 0) || isLoading} className="h-[38px] w-[38px] shrink-0">{isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}</Button></div>
       </form>
