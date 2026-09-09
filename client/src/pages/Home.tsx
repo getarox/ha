@@ -50,13 +50,14 @@ function RobotFace({ state }: { state: FaceState }) {
 }
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [faceState, setFaceState] = useState<FaceState>("idle");
   const [sessionId] = useState(getSessionId);
   const [chatPending, setChatPending] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [paymentPending, setPaymentPending] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const status = faceCopy[faceState];
   const messageCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
@@ -104,10 +105,7 @@ export default function Home() {
     }).then(async (response) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر إكمال الطلب الآن.");
-      setMessages((current) => [...current, { role: "assistant", content: data.reply }]);
-      void fetch("/api/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: data.reply, voiceId: "female" }) })
-        .then(async (voiceResponse) => { if (!voiceResponse.ok) return; const voice = await voiceResponse.json(); await new Audio(`data:${voice.contentType};base64,${voice.audioBase64}`).play(); })
-        .catch(() => undefined);
+      setMessages((current) => [...current, { role: "assistant", content: data.reply, sources: Array.isArray(data.sources) ? data.sources : undefined }]);
       setFaceState("replying");
       window.setTimeout(() => setFaceState("idle"), 900);
     }).catch((error: any) => {
@@ -161,8 +159,8 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
           {user?.role === "admin" ? <Link href="/owner" className="hidden sm:block"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">لوحة المالك</Button></Link> : null}
-          {!user ? <Button onClick={() => startLogin()} className="hidden bg-cyan-300 text-slate-950 hover:bg-cyan-200 sm:inline-flex">دخول المالك</Button> : null}
-          <Button variant="ghost" size="icon" className="text-slate-300 md:hidden" aria-label="فتح القائمة"><Menu className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" className="text-slate-300" aria-label="فتح القائمة" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Menu className="h-5 w-5" /></Button>
+          {menuOpen && <div className="absolute end-5 top-16 z-40 w-56 rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-3 text-sm text-slate-200 shadow-2xl backdrop-blur-xl">{user ? <button type="button" className="block w-full rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => void logout()}>تسجيل الخروج</button> : <button type="button" className="block w-full rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => startLogin()}>تسجيل الدخول</button>}<a className="block rounded-lg px-3 py-2 hover:bg-white/10" href="#conversation">الدعم والإبلاغ عن مشكلة</a><a className="block rounded-lg px-3 py-2 hover:bg-white/10" href="#plans">الخطط</a></div>}
         </div>
       </header>
 

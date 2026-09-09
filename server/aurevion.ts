@@ -9,7 +9,7 @@ import {
   updateAurevionSession,
 } from "./db.js";
 import { getLiveContext } from "./liveTools.js";
-import { formatSearchContext, searchWeb } from "./searchEngines.js";
+import { formatSearchContext, searchWeb, type SearchResult } from "./searchEngines.js";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type StoredContext = ChatMessage[];
@@ -138,34 +138,30 @@ async function callGroq(model: string, messages: Array<{ role: "system" | "user"
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "خادم Groq غير مهيأ بعد." });
   }
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${ENV.groqApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-      max_completion_tokens: 1200,
-    }),
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = typeof payload?.error?.message === "string" ? payload.error.message : "تعذر الاتصال بخدمة Groq.";
-    const error = new Error(message) as Error & { status?: number; code?: string };
-    error.status = response.status;
-    error.code = payload?.error?.code;
-    throw error;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ENV.groqApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model, messages, temperature: 0.7, max_completion_tokens: 1200 }),
+        signal: AbortSignal.timeout(25_000),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(typeof payload?.error?.message === "string" ? payload.error.message : "تعذر الاتصال بخدمة Groq.") as Error & { status?: number; code?: string };
+        error.status = response.status; error.code = payload?.error?.code;
+        throw error;
+      }
+      const content = payload?.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim()) throw new Error("لم يرجع Groq نصًا صالحًا.");
+      return content.trim();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 350));
+    }
   }
-
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("لم يرجع Groq نصًا صالحًا.");
-  }
-  return content.trim();
+  throw lastError instanceof Error ? lastError : new Error("تعذر الاتصال بخدمة Groq.");
 }
 
 export function isAllowedAurevionOrigin(origin: string | undefined) {
@@ -272,8 +268,9 @@ export async function chatWithAurevion(options: ChatOptions) {
   catch (error) { console.warn("[AUREVION] Live tool unavailable:", error); liveResult = { tool: "weather", text: `تعذر جلب البيانات اللحظية لهذه المحاولة: ${error instanceof Error ? error.message : "المدينة أو الخدمة غير متاحة"}. لا تقل إن الوصول للطقس غير ممكن عمومًا؛ اطلب من المستخدم اسم مدينة أوضح.` }; }
   const wantsFreshData = /(اليوم|الآن|حالي|حاليًا|آخر|اخر|جديد|حديث|2025|2026|خبر|أخبار|سعر|طقس|نتيجة|موعد|live|latest|today|now)/i.test(latestUserMessage.content);
   let webResults = "";
+  let sources: SearchResult[] = [];
   if (options.webSearch || wantsFreshData) {
-    try { webResults = formatSearchContext(await searchWeb(latestUserMessage.content)); }
+    try { sources = await searchWeb(latestUserMessage.content); webResults = formatSearchContext(sources); }
     catch (error) { console.warn("[AUREVION] Web search unavailable:", error); }
   }
   const brainHint = pythonResult?.handled
@@ -305,6 +302,7 @@ export async function chatWithAurevion(options: ChatOptions) {
     reply,
     model: usedModel,
     searched: Boolean(webResults),
+    sources: sources.slice(0, 6).map(({ title, url, snippet, source }) => ({ title, url, snippet, source })),
     plan: state.plan,
     remaining: limit > 0 ? Math.max(0, limit - state.messagesUsed) : null,
   };

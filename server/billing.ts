@@ -28,8 +28,8 @@ export async function createPayTabsPayment(input: { sessionKey: string; amount: 
   const payload: Record<string, unknown> = {
     profile_id: Number(ENV.paytabsProfileId), tran_type: "sale", tran_class: "ecom", cart_id: id,
     cart_currency: ENV.walletCurrency, cart_amount: money(input.amount), cart_description: input.description ?? "AUREVION wallet top-up",
-    callback: ENV.paytabsCallbackUrl || `${ENV.officialSiteUrl}/api/payments/paytabs/callback`,
-    return: ENV.paytabsReturnUrl || `${ENV.officialSiteUrl}/api/payments/paytabs/return`,
+    callback: ENV.paytabsCallbackUrl || `${ENV.officialSiteUrl}/api/payments/callback`,
+    return: ENV.paytabsReturnUrl || `${ENV.officialSiteUrl}/api/payments/return`,
     customer_details: { name: input.customer?.name ?? "AUREVION customer", email: input.customer?.email ?? "", phone: input.customer?.phone ?? "" },
   };
   const response = await fetch(`${ENV.paytabsEndpoint.replace(/\/$/, "")}/payment/request`, {
@@ -62,7 +62,12 @@ export async function settlePayTabsCallback(data: Record<string, any>) {
   const paid = status === "A";
   await db.update(payments).set({ status: paid ? "paid" : status === "C" ? "cancelled" : "failed", tranRef: String(data.tran_ref ?? data.tranRef ?? payment.tranRef ?? ""), rawResponse: JSON.stringify(data) }).where(eq(payments.id, payment.id));
   if (!paid) return { status: "failed" };
-  const wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0] ?? (await db.insert(wallets).values({ sessionKey: payment.sessionKey, currency: payment.currency }).$returningId())[0];
+  let wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
+  if (!wallet) {
+    await db.insert(wallets).values({ sessionKey: payment.sessionKey, currency: payment.currency });
+    wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
+  }
+  if (!wallet) throw new Error("تعذر إنشاء محفظة العميل.");
   await db.update(wallets).set({ balance: sql`${wallets.balance} + ${amount}` }).where(eq(wallets.id, wallet.id));
   await db.insert(walletLedger).values({ walletId: wallet.id, reference: `payment:${payment.cartId}`, type: "credit", amount: amount.toFixed(2), description: "PayTabs wallet top-up" });
   return { status: "paid", balanceAdded: amount };

@@ -1,5 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,20 +5,12 @@ import { cn } from "@/lib/utils";
 import {
   AudioLines,
   Volume2,
-  Code2,
-  FileText,
-  Flag,
-  History,
   ImagePlus,
-  LifeBuoy,
   Loader2,
-  LogIn,
-  LogOut,
   MessageCircle,
   Mic,
   Paperclip,
   Send,
-  Settings2,
   Sparkles,
   Square,
   User,
@@ -51,6 +41,7 @@ export type Message = {
   role: "system" | "user" | "assistant";
   content: string;
   imageUrl?: string;
+  sources?: Array<{ title: string; url: string; snippet: string; source: string }>;
 };
 
 export type AIChatBoxProps = {
@@ -81,19 +72,9 @@ export function AIChatBox({
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState("");
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [developerMode, setDeveloperMode] = useState(false);
-  const [voicePreset, setVoicePreset] = useState("female");
+  const [voicePreset] = useState("female");
   const [voiceLoading, setVoiceLoading] = useState<number | null>(null);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [feedbackCategory, setFeedbackCategory] = useState<"support" | "bug">("support");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [feedbackSending, setFeedbackSending] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const voiceCallTimerRef = useRef<number | null>(null);
-  const { user, logout } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
@@ -105,27 +86,6 @@ export function AIChatBox({
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
   const displayMessages = messages.filter((msg) => msg.role !== "system");
   const [minHeightForLastMessage, setMinHeightForLastMessage] = useState(0);
-  const submitFeedback = async () => {
-    if (feedbackMessage.trim().length < 3 || feedbackSending) return;
-    setFeedbackSending(true);
-    try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: feedbackCategory, message: feedbackMessage.trim(), sessionId: localStorage.getItem("aurevion-session-id") }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "تعذر إرسال البلاغ.");
-      setFeedbackMessage("");
-      setFeedbackOpen(false);
-      setRecordingStatus(data.message || "تم استلام البلاغ.");
-    } catch (error: any) {
-      setRecordingStatus(error?.message || "تعذر إرسال البلاغ.");
-    } finally {
-      setFeedbackSending(false);
-    }
-  };
-
   useEffect(() => {
     if (containerRef.current && inputAreaRef.current) {
       const scrollAreaHeight = containerRef.current.offsetHeight - inputAreaRef.current.offsetHeight;
@@ -139,9 +99,8 @@ export function AIChatBox({
       streamRef.current?.getTracks().forEach((track) => track.stop());
       speechRef.current?.stop();
       if (voiceCallTimerRef.current) window.clearTimeout(voiceCallTimerRef.current);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
-  }, [audioUrl]);
+  }, []);
 
   const scrollToBottom = () => {
     const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLDivElement | null;
@@ -151,7 +110,9 @@ export function AIChatBox({
   const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
-    setSelectedFiles((current) => [...current, ...files].slice(-5));
+    const accepted = files.filter((file) => file.size <= 10 * 1024 * 1024);
+    if (accepted.length < files.length) setRecordingStatus("تم تجاهل ملف يتجاوز 10MB.");
+    setSelectedFiles((current) => [...current, ...accepted].slice(-5));
     setRecordingStatus(`تم اختيار ${files.length} ملف محليًا — لن يتم رفعه تلقائيًا.`);
     event.target.value = "";
   };
@@ -159,7 +120,6 @@ export function AIChatBox({
   const handleRecordToggle = async () => {
     if (isRecording) {
       recorderRef.current?.stop();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
@@ -177,18 +137,16 @@ export function AIChatBox({
       };
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        setAudioBlob(blob);
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-        setAudioUrl(URL.createObjectURL(blob));
         setIsRecording(false);
-        setRecordingStatus("تم حفظ التسجيل محليًا. يمكنك الاستماع إليه قبل إرسال رسالتك.");
+        setRecordingStatus("جارٍ تجهيز التسجيل للإرسال…");
         stream.getTracks().forEach((track) => track.stop());
+        void sendRecordedAudio(blob);
       };
       recorder.start();
       setIsRecording(true);
-      setRecordingStatus("جارٍ التسجيل محليًا… اضغط مرة أخرى للإيقاف.");
+      setRecordingStatus("جارٍ التسجيل… ارفع إصبعك لإرسال التسجيل مباشرة.");
     } catch {
-      setRecordingStatus("لم نتمكن من الوصول إلى الميكروفون. تحقق من إذن المتصفح.");
+      setRecordingStatus("لم نتمكن من الوصول إلى الميكروفون. اسمح باستخدام الميكروفون ثم حاول مرة أخرى.");
     }
   };
 
@@ -267,20 +225,20 @@ export function AIChatBox({
     }
   };
 
-  const sendRecordedAudio = async () => {
-    if (!audioBlob || isLoading) return;
+  const sendRecordedAudio = async (recordedBlob: Blob) => {
+    if (isLoading) return;
     setRecordingStatus("جارٍ تحويل التسجيل إلى نص…");
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
         const encoded = String(reader.result).split(",")[1] ?? "";
-        const response = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioBase64: encoded, mimeType: audioBlob.type }) });
+        const response = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioBase64: encoded, mimeType: recordedBlob.type }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "تعذر تحويل التسجيل إلى نص.");
-        if (data.text) { onSendMessage(data.text); setAudioBlob(null); setAudioUrl(null); setRecordingStatus("تم إرسال التسجيل."); }
+        if (data.text) { onSendMessage(data.text); setRecordingStatus("تم إرسال التسجيل."); }
       } catch (error: any) { setRecordingStatus(error?.message || "تعذر إرسال التسجيل."); }
     };
-    reader.readAsDataURL(audioBlob);
+    reader.readAsDataURL(recordedBlob);
   };
 
   const playAssistantVoice = async (text: string, index: number) => {
@@ -311,7 +269,7 @@ export function AIChatBox({
               const shouldApplyMinHeight = isLastMessage && !isLoading && minHeightForLastMessage > 0;
               return <div key={index} className={cn("flex items-start gap-3", message.role === "user" ? "justify-end" : "justify-start")} style={shouldApplyMinHeight ? { minHeight: `${minHeightForLastMessage}px` } : undefined}>
                 {message.role === "assistant" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10"><Sparkles className="size-4 text-primary" /></div>}
-                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <><div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div>{message.imageUrl && <img src={message.imageUrl} alt="صورة منشأة داخل المحادثة" className="mt-3 max-h-[28rem] w-full rounded-xl border border-white/10 object-contain" />}<button type="button" onClick={() => void playAssistantVoice(message.content, index)} disabled={voiceLoading === index} className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-100">{voiceLoading === index ? <Loader2 className="size-3 animate-spin" /> : <Volume2 className="size-3" />} استمع</button></> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
+                <div className={cn("max-w-[80%] rounded-lg px-4 py-2.5", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{message.role === "assistant" ? <><div className="prose prose-sm dark:prose-invert max-w-none"><Streamdown>{message.content}</Streamdown></div>{message.imageUrl && <img src={message.imageUrl} alt="صورة منشأة داخل المحادثة" loading="lazy" className="mt-3 max-h-[28rem] w-full rounded-xl border border-white/10 object-contain" />} {message.sources && message.sources.length > 0 && <div className="mt-4 space-y-2 border-t border-white/10 pt-3"><p className="text-[11px] font-semibold text-cyan-200">مصادر البحث</p>{message.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-white/10 bg-black/10 p-2 text-[11px] transition hover:border-cyan-300/40"><span className="block truncate text-slate-200">{source.title}</span><span className="mt-1 block line-clamp-2 text-slate-500">{source.snippet}</span><span className="mt-1 block text-cyan-300/70">{source.source}</span></a>)}</div>}<button type="button" onClick={() => void playAssistantVoice(message.content, index)} disabled={voiceLoading === index} className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-100">{voiceLoading === index ? <Loader2 className="size-3 animate-spin" /> : <Volume2 className="size-3" />} استمع</button></> : <p className="whitespace-pre-wrap text-sm">{message.content}</p>}</div>
                 {message.role === "user" && <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary"><User className="size-4 text-secondary-foreground" /></div>}
               </div>;
             })}
@@ -321,41 +279,19 @@ export function AIChatBox({
       </div>
 
       <form ref={inputAreaRef} onSubmit={handleSubmit} className="relative flex flex-col gap-3 border-t bg-background/50 p-4">
-        {historyOpen && <div className="absolute bottom-[calc(100%+0.75rem)] end-4 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-4 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl">
-          <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-semibold">سجل الجلسات</p><p className="mt-1 text-[11px] text-slate-500">جلساتك محفوظة محليًا على هذا الجهاز</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => setHistoryOpen(false)} aria-label="إغلاق السجل"><X className="size-4" /></Button></div>
-          <div className="max-h-56 space-y-2 overflow-auto">{(() => { try { const items = JSON.parse(localStorage.getItem("aurevion-session-history") || "[]") as Array<{ title?: string; date?: string; count?: number }>; return items.length ? items.map((item, index) => <div key={`${item.date}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs"><p className="truncate text-slate-200">{item.title || "جلسة AUREVION"}</p><p className="mt-1 text-slate-500">{item.date ? new Date(item.date).toLocaleString("ar-IQ") : ""} · {item.count ?? 0} رسالة</p></div>) : <p className="rounded-lg bg-white/[0.04] p-3 text-xs text-slate-500">لا توجد جلسات محفوظة بعد.</p>; } catch { return <p className="text-xs text-slate-500">لا يمكن قراءة السجل المحلي.</p>; } })()}</div>
-        </div>}
-        {feedbackOpen && <div className="absolute bottom-[calc(100%+0.75rem)] end-4 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-4 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl">
-          <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-semibold">خدمة العملاء</p><p className="mt-1 text-[11px] text-slate-500">يرسل طلبك مباشرة إلى فريق AUREVION</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => setFeedbackOpen(false)} aria-label="إغلاق"><X className="size-4" /></Button></div>
-          <div className="mb-3 flex gap-2"><button type="button" onClick={() => setFeedbackCategory("support")} className={cn("rounded-lg px-3 py-1.5 text-xs", feedbackCategory === "support" ? "bg-cyan-300 text-slate-950" : "bg-white/10")}>دعم</button><button type="button" onClick={() => setFeedbackCategory("bug")} className={cn("rounded-lg px-3 py-1.5 text-xs", feedbackCategory === "bug" ? "bg-cyan-300 text-slate-950" : "bg-white/10")}>إبلاغ عن مشكلة</button></div>
-          <textarea value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="اكتب طلبك أو تفاصيل المشكلة..." className="min-h-24 w-full resize-y rounded-lg border border-white/10 bg-white/5 p-3 text-sm outline-none focus:border-cyan-300/50" />
-          <Button type="button" onClick={() => void submitFeedback()} disabled={feedbackSending || feedbackMessage.trim().length < 3} className="mt-3 w-full">{feedbackSending ? <Loader2 className="size-4 animate-spin" /> : "إرسال إلى خدمة العملاء"}</Button>
-        </div>}
-        {settingsOpen && <div className="absolute bottom-[calc(100%+0.75rem)] end-4 z-20 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-3 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl">
-          <div className="mb-2 flex items-center justify-between border-b border-white/10 px-2 pb-3"><div><p className="text-sm font-semibold">إعدادات المحادثة</p><p className="mt-1 text-[11px] text-slate-500">تحكم سريع في تجربتك</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white" onClick={() => setSettingsOpen(false)} aria-label="إغلاق الإعدادات"><X className="size-4" /></Button></div>
-          <div className="space-y-1">
-            <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => setRecordingStatus("سيظهر سجل هذه الجلسة هنا قريبًا — رسائلك الحالية محفوظة محليًا.")}><History className="size-4 text-cyan-300" /><span className="flex-1">History</span><span className="text-[10px] text-slate-500">الجلسة الحالية</span></button>
-            {user ? <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => void logout()}><LogOut className="size-4 text-cyan-300" /><span>تسجيل الخروج</span><span className="ms-auto max-w-24 truncate text-[10px] text-slate-500">{user.name || "الحساب"}</span></button> : <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => startLogin()}><LogIn className="size-4 text-cyan-300" /><span>تسجيل الدخول</span></button>}
-            <button type="button" onClick={() => { setHistoryOpen(true); setFeedbackOpen(false); setSettingsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-right transition hover:bg-white/[0.07]"><History className="size-4 text-cyan-300" /><span>سجل الجلسات</span></button>
-            <button type="button" onClick={() => { setFeedbackCategory("support"); setFeedbackOpen(true); setHistoryOpen(false); setSettingsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-right transition hover:bg-white/[0.07]"><LifeBuoy className="size-4 text-cyan-300" /><span>الدعم</span></button>
-            <button type="button" onClick={() => { setFeedbackCategory("bug"); setFeedbackOpen(true); setSettingsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-right transition hover:bg-white/[0.07]"><Flag className="size-4 text-cyan-300" /><span>الإبلاغ عن مشكلة</span></button>
-            <a href="/#plans" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/[0.07]"><FileText className="size-4 text-cyan-300" /><span>الخطط</span></a>
-            <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right text-sm transition hover:bg-white/[0.07]" onClick={() => setDeveloperMode((current) => !current)}><Code2 className="size-4 text-cyan-300" /><span className="flex-1">وضع Developer</span><span className={cn("h-5 w-9 rounded-full p-0.5 transition", developerMode ? "bg-cyan-300" : "bg-slate-700")}><span className={cn("block size-4 rounded-full bg-white transition", developerMode ? "translate-x-4" : "translate-x-0")} /></span></button>
-          </div>
-          <label className="mt-2 flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-xs"><span>نبرة الرد الصوتي</span><select value={voicePreset} onChange={(event) => setVoicePreset(event.target.value)} className="rounded bg-slate-800 px-2 py-1 text-xs"><option value="female">أنثى</option><option value="male">ذكر</option><option value="calm">هادئ</option></select></label>
-          {developerMode && <p className="mt-2 rounded-lg bg-cyan-300/10 px-3 py-2 text-[11px] leading-5 text-cyan-100">وضع المطور مفعل محليًا. لا يتم إرسال أي مفاتيح أو بيانات إضافية.</p>}
-        </div>}
+
+
+
 
         <div className="flex items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-1">
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={() => fileInputRef.current?.click()} aria-label="إرفاق ملفات"><Paperclip className="size-4" /></Button>
           {onGenerateImage && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={handleGenerateImage} aria-label="إنشاء صورة من الوصف" title="إنشاء صورة من الوصف"><ImagePlus className="size-4" /></Button>}
-          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onClick={() => void handleRecordToggle()} aria-label={isRecording ? "إيقاف التسجيل" : "بدء التسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
+          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); void handleRecordToggle(); }} onPointerUp={(event) => { event.currentTarget.releasePointerCapture?.(event.pointerId); if (isRecording) void handleRecordToggle(); }} onPointerCancel={() => { if (isRecording) void handleRecordToggle(); }} onPointerLeave={(event) => { if (isRecording && event.buttons === 0) void handleRecordToggle(); }} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !isRecording) { event.preventDefault(); void handleRecordToggle(); } }} onKeyUp={(event) => { if ((event.key === "Enter" || event.key === " ") && isRecording) { event.preventDefault(); void handleRecordToggle(); } }} aria-label={isRecording ? "ارفع إصبعك لإرسال التسجيل" : "اضغط باستمرار للتسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية لمدة خمس دقائق" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
-          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", settingsOpen && "bg-cyan-300/15 text-cyan-200")} onClick={() => setSettingsOpen((current) => !current)} aria-label="فتح الإعدادات" aria-expanded={settingsOpen}><Settings2 className="size-4" /></Button>
         </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
 
-        {(recordingStatus || audioUrl) && <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-400"><AudioLines className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{recordingStatus || "تسجيل صوتي جاهز للإرسال"}</span>{audioUrl && <audio controls src={audioUrl} className="h-7 max-w-32" />} {audioBlob && <Button type="button" size="sm" onClick={() => void sendRecordedAudio()} disabled={isLoading} className="h-7 px-2 text-[11px]">إرسال</Button>}</div>}
+        {recordingStatus && <div role="status" className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-slate-400"><AudioLines className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{recordingStatus}</span></div>}
 
         <div className="flex items-end gap-2"><Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder={placeholder} className="min-h-9 max-h-32 flex-1 resize-none" rows={1} /><Button type="submit" size="icon" disabled={(!input.trim() && selectedFiles.length === 0) || isLoading} className="h-[38px] w-[38px] shrink-0">{isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}</Button></div>
       </form>
