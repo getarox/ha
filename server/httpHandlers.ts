@@ -6,6 +6,17 @@ import { synthesizeVoice } from "./voice.js";
 import { transcribeAudio } from "./transcribe.js";
 import { createAurevionFeedback } from "./db.js";
 
+const requestWindows = new Map<string, { started: number; count: number }>();
+function allowRequest(req: VercelRequest, bucket: string, limit: number) {
+  const address = typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0] : "unknown";
+  const key = `${bucket}:${address}`;
+  const now = Date.now(); const current = requestWindows.get(key);
+  if (!current || now - current.started >= 60_000) { requestWindows.set(key, { started: now, count: 1 }); return true; }
+  if (current.count >= limit) return false;
+  current.count += 1; return true;
+}
+function rateLimited(req: VercelRequest, res: VercelResponse, bucket: string, limit: number) { if (allowRequest(req, bucket, limit)) return false; res.setHeader("Retry-After", "60"); res.status(429).json({ error: "طلبات كثيرة جدًا. حاول بعد دقيقة." }); return true; }
+
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 function cors(req: VercelRequest, res: VercelResponse) {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
@@ -17,6 +28,7 @@ function cors(req: VercelRequest, res: VercelResponse) {
 }
 export async function chat(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (rateLimited(req, res, "chat", 60)) return;
   const key = typeof req.headers["x-aurevion-client-key"] === "string" ? req.headers["x-aurevion-client-key"] : undefined;
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : "";
   const host = typeof req.headers.host === "string" ? req.headers.host : "";
@@ -27,6 +39,7 @@ export async function chat(req: VercelRequest, res: VercelResponse) {
 }
 export async function image(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const body = req.body || {};
+  if (rateLimited(req, res, "image", 20)) return;
   if (typeof body.sessionId !== "string" || typeof body.mode !== "string" || typeof body.prompt !== "string") return res.status(400).json({ error: "بيانات عملية الصورة غير صالحة." });
   if (!["generate", "edit", "analyze", "evaluate"].includes(body.mode)) return res.status(400).json({ error: "وضع الصورة غير صالح." });
   try { return res.status(200).json(await runImageStudio({ sessionId: body.sessionId, mode: body.mode, prompt: body.prompt, imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined, mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined, pro: Boolean(body.pro) })); } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر تنفيذ عملية الصور حاليًا." }); }
@@ -38,6 +51,7 @@ export async function paymentCallback(req: VercelRequest, res: VercelResponse) {
 export async function paymentReturn(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, message: "تم استلام نتيجة الدفع. سيتم تحديث الرصيد عبر callback الآمن." }); }
 export async function voice(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (rateLimited(req, res, "voice", 20)) return;
   const body = req.body ?? {};
   if (typeof body.text !== "string" || !body.text.trim()) return res.status(400).json({ error: "النص الصوتي مطلوب." });
   const voiceId = body.voiceId === "male" || body.voiceId === "calm" || body.voiceId === "female" ? undefined : typeof body.voiceId === "string" ? body.voiceId : undefined;
@@ -47,6 +61,7 @@ export async function voice(req: VercelRequest, res: VercelResponse) {
 }
 export async function transcribe(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (rateLimited(req, res, "transcribe", 20)) return;
   const body = req.body ?? {};
   if (typeof body.audioBase64 !== "string") return res.status(400).json({ error: "التسجيل الصوتي مطلوب." });
   try { return res.status(200).json(await transcribeAudio(body.audioBase64, typeof body.mimeType === "string" ? body.mimeType : "audio/webm")); }
@@ -57,6 +72,7 @@ export async function feedback(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (rateLimited(req, res, "feedback", 5)) return;
   const body = req.body ?? {};
   const category = body.category;
   const message = typeof body.message === "string" ? body.message.trim() : "";

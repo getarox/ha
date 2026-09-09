@@ -39,8 +39,8 @@ async function findAvailablePort(startPort = 3000): Promise<number> {
 export async function createApp() {
   const app = express();
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: "12mb" }));
+  app.use(express.urlencoded({ limit: "12mb", extended: true }));
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
