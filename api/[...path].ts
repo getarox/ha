@@ -4,7 +4,8 @@ let appPromise: Promise<any> | undefined;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const path = String(req.url ?? "").split("?")[0].replace(/\/$/, "");
   if (path === "/api/health" || path === "/api/aurevion/health") {
-    return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" });
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({ ok: true, service: "aurevion-vercel-api", release: process.env.VERCEL_GIT_COMMIT_SHA ?? "local", cloud_fallback: "groq" });
   }
   const handlers = await import("../server/httpHandlers.js");
   if (path === "/api/voice") return handlers.voice(req, res);
