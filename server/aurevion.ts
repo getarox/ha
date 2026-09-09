@@ -273,6 +273,12 @@ export async function chatWithAurevion(options: ChatOptions) {
     try { sources = await searchWeb(latestUserMessage.content); webResults = formatSearchContext(sources); }
     catch (error) { console.warn("[AUREVION] Web search unavailable:", error); }
   }
+  if (wantsFreshData && !webResults && !liveResult) {
+    const safeReply = "لا أستطيع تأكيد معلومة حديثة الآن لأن مصدر البحث المباشر غير متاح. لن أخمّن أو أختلق نتيجة؛ أعد المحاولة بعد لحظات أو أرسل رابطًا محددًا لأتحقق منه.";
+    state.messagesUsed += 1;
+    await persistSessionState(state, sessionKey, [...context, { role: "assistant", content: safeReply }]);
+    return { reply: safeReply, model: "safety-fallback", searched: false, sources: [], plan: state.plan, remaining: limit > 0 ? Math.max(0, limit - state.messagesUsed) : null };
+  }
   const brainHint = pythonResult?.handled
     ? `\nنتيجة طبقة العقل المحلي: ${pythonResult.reply ?? "تم تنفيذ الإجراء المحلي."}${pythonResult.action ? ` (action=${pythonResult.action})` : ""}. أجب للمستخدم أنت عبر Groq مع توضيح النتيجة.`
     : pythonResult?.tool
