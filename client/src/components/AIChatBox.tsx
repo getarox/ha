@@ -54,6 +54,7 @@ export type AIChatBoxProps = {
   emptyStateMessage?: string;
   suggestedPrompts?: string[];
   onGenerateImage?: (prompt: string) => void | Promise<void>;
+  voicePreset?: "female" | "male" | "calm";
 };
 
 export function AIChatBox({
@@ -66,13 +67,13 @@ export function AIChatBox({
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
   onGenerateImage,
+  voicePreset = "female",
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceChatting, setIsVoiceChatting] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState("");
-  const [voicePreset] = useState("female");
   const [voiceLoading, setVoiceLoading] = useState<number | null>(null);
   const voiceCallTimerRef = useRef<number | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);

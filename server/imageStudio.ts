@@ -45,7 +45,7 @@ async function ensureSession(sessionId: string) {
   return undefined;
 }
 
-async function consumeImageQuota(sessionId: string, requestedPro: boolean) {
+async function checkImageQuota(sessionId: string, requestedPro: boolean) {
   const persisted = await ensureSession(sessionId);
   const memory = getMemoryState(cleanSessionId(sessionId));
   const plan = persisted?.plan ?? memory.plan;
@@ -57,11 +57,16 @@ async function consumeImageQuota(sessionId: string, requestedPro: boolean) {
   if (used >= limit) {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `انتهت حصة الصور لهذه الخطة (${limit}).` });
   }
-  const next = used + 1;
-  memory.plan = plan;
+  return { plan, used, limit, persisted };
+}
+
+async function consumeImageQuota(sessionId: string, quota: Awaited<ReturnType<typeof checkImageQuota>>) {
+  const next = quota.used + 1;
+  const memory = getMemoryState(cleanSessionId(sessionId));
+  memory.plan = quota.plan;
   memory.imagesUsed = next;
-  if (persisted) await updateAurevionSession(persisted.id, { imagesUsed: next });
-  return { plan, remaining: Math.max(0, limit - next) };
+  if (quota.persisted) await updateAurevionSession(quota.persisted.id, { imagesUsed: next });
+  return { plan: quota.plan, remaining: Math.max(0, quota.limit - next) };
 }
 
 function decodeDataUrl(value: string) {
@@ -124,7 +129,7 @@ export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
 }
 
 export async function runImageStudio(input: ImageStudioInput) {
-  const quota = await consumeImageQuota(input.sessionId, Boolean(input.pro));
+  const quotaCheck = await checkImageQuota(input.sessionId, Boolean(input.pro));
   const model = getImageStudioModel(input.mode, Boolean(input.pro));
   let provider = "groq";
   let result;
@@ -139,5 +144,6 @@ export async function runImageStudio(input: ImageStudioInput) {
     try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
     catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
   }
+  const quota = await consumeImageQuota(input.sessionId, quotaCheck);
   return { ...result, provider, plan: quota.plan, remaining: quota.remaining, model: provider === "pollinations" ? "pollinations.ai" : model };
 }
