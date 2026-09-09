@@ -24,6 +24,7 @@ export async function getWallet(sessionKey: string) {
 export async function createPayTabsPayment(input: { sessionKey: string; amount: number; description?: string; customer?: { name?: string; email?: string; phone?: string } }) {
   if (!ENV.paytabsProfileId || !ENV.paytabsServerKey) throw new Error("PayTabs غير مفعّل على الخادم.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("مبلغ الدفع غير صالح.");
+  if (![25, 100].includes(money(input.amount))) throw new Error("مبلغ الخطة غير متاح.");
   const id = cartId(input.sessionKey);
   const payload: Record<string, unknown> = {
     profile_id: Number(ENV.paytabsProfileId), tran_type: "sale", tran_class: "ecom", cart_id: id,
@@ -59,17 +60,22 @@ export async function settlePayTabsCallback(data: Record<string, any>) {
   const payment = (await db.select().from(payments).where(eq(payments.cartId, cart)).limit(1))[0];
   if (!payment) throw new Error("عملية الدفع غير معروفة.");
   if (payment.status === "paid" || payment.status === "failed" || payment.status === "cancelled") return { status: payment.status, duplicate: true };
+  if (money(payment.amount) !== amount || String(payment.currency).toUpperCase() !== ENV.walletCurrency.toUpperCase()) throw new Error("مبلغ أو عملة الدفع لا تطابق العملية الأصلية.");
   const paid = status === "A";
-  await db.update(payments).set({ status: paid ? "paid" : status === "C" ? "cancelled" : "failed", tranRef: String(data.tran_ref ?? data.tranRef ?? payment.tranRef ?? ""), rawResponse: JSON.stringify(data) }).where(eq(payments.id, payment.id));
+  const updateResult = await db.update(payments).set({ status: paid ? "paid" : status === "C" ? "cancelled" : "failed", tranRef: String(data.tran_ref ?? data.tranRef ?? payment.tranRef ?? ""), rawResponse: JSON.stringify(data) }).where(and(eq(payments.id, payment.id), eq(payments.status, "pending")));
+  const affectedRows = Number((updateResult as any)?.affectedRows ?? (updateResult as any)?.[0]?.affectedRows ?? 0);
+  if (affectedRows !== 1) return { status: "duplicate", duplicate: true };
   if (!paid) return { status: "failed" };
-  let wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
-  if (!wallet) {
-    await db.insert(wallets).values({ sessionKey: payment.sessionKey, currency: payment.currency });
-    wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
-  }
-  if (!wallet) throw new Error("تعذر إنشاء محفظة العميل.");
-  await db.update(wallets).set({ balance: sql`${wallets.balance} + ${amount}` }).where(eq(wallets.id, wallet.id));
-  await db.insert(walletLedger).values({ walletId: wallet.id, reference: `payment:${payment.cartId}`, type: "credit", amount: amount.toFixed(2), description: "PayTabs wallet top-up" });
+  await db.transaction(async (tx) => {
+    let wallet = (await tx.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
+    if (!wallet) {
+      await tx.insert(wallets).values({ sessionKey: payment.sessionKey, currency: payment.currency });
+      wallet = (await tx.select().from(wallets).where(eq(wallets.sessionKey, payment.sessionKey)).limit(1))[0];
+    }
+    if (!wallet) throw new Error("تعذر إنشاء محفظة العميل.");
+    await tx.update(wallets).set({ balance: sql`${wallets.balance} + ${amount}` }).where(eq(wallets.id, wallet.id));
+    await tx.insert(walletLedger).values({ walletId: wallet.id, reference: `payment:${payment.cartId}`, type: "credit", amount: amount.toFixed(2), description: "PayTabs wallet top-up" });
+  });
   return { status: "paid", balanceAdded: amount };
 }
 
@@ -79,7 +85,9 @@ export async function chargeUsage(sessionKey: string, operation: "chat" | "image
   if (!db) { const current = money(memoryWallets.get(sessionKey) ?? 0); if (current < price) throw new Error("رصيد المحفظة غير كافٍ."); memoryWallets.set(sessionKey, money(current - price)); return { charged: price, remaining: money(current - price) }; }
   const wallet = (await db.select().from(wallets).where(eq(wallets.sessionKey, sessionKey)).limit(1))[0];
   if (!wallet || money(wallet.balance) < price) throw new Error("رصيد المحفظة غير كافٍ.");
-  await db.update(wallets).set({ balance: sql`${wallets.balance} - ${price}` }).where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${price}`));
+  const updateResult = await db.update(wallets).set({ balance: sql`${wallets.balance} - ${price}` }).where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${price}`));
+  const affectedRows = Number((updateResult as any)?.affectedRows ?? (updateResult as any)?.[0]?.affectedRows ?? 0);
+  if (affectedRows !== 1) throw new Error("رصيد المحفظة غير كافٍ.");
   await db.insert(walletLedger).values({ walletId: wallet.id, reference: `usage:${requestId}`, type: "debit", amount: price.toFixed(2), description: `${operation} usage` });
   await db.insert(aiUsage).values({ sessionKey, operation, provider, model, amount: price.toFixed(2), requestId });
   const updated = (await db.select().from(wallets).where(eq(wallets.id, wallet.id)).limit(1))[0];
