@@ -113,7 +113,7 @@ export function AIChatBox({
   const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
-    const accepted = files.filter((file) => file.size <= 10 * 1024 * 1024);
+    const accepted = files.filter((file) => file.size <= (file.type.startsWith("image/") ? 4 : 10) * 1024 * 1024);
     if (accepted.length < files.length) setRecordingStatus("تم تجاهل ملف يتجاوز 10MB.");
     setSelectedFiles((current) => [...current, ...accepted].slice(-5));
     setRecordingStatus(`تم اختيار ${files.length} ملف محليًا — لن يتم رفعه تلقائيًا.`);

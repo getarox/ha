@@ -168,10 +168,11 @@ export default function Home() {
     setMessages((current) => [...current, { role: "user", content: prompt }]);
     setFaceState("thinking"); setChatPending(true);
     try {
-      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode: "analyze", prompt, imageBase64: imageDataUrl, mimeType: imageDataUrl.match(/^data:([^;]+);/)?.[1] || "image/png", pro: false }) });
+      const mode = /(?:عدل|تعديل|حرر|غيّر|edit|modify)/i.test(prompt) ? "edit" : "analyze";
+      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt, imageBase64: imageDataUrl, mimeType: imageDataUrl.match(/^data:([^;]+);/)?.[1] || "image/png", pro: false }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر تحليل الصورة.");
-      setMessages((current) => [...current, { role: "assistant", content: data.text || "تم تحليل الصورة." }]);
+      setMessages((current) => [...current, { role: "assistant", content: data.text || (mode === "edit" ? "تم تعديل الصورة." : "تم تحليل الصورة."), imageUrl: typeof data.imageDataUrl === "string" ? data.imageDataUrl : undefined }]);
       setFaceState("replying"); window.setTimeout(() => setFaceState("idle"), 900);
     } catch (error: any) { setMessages((current) => [...current, { role: "assistant", content: `تعذر تحليل الصورة. ${error?.message || "حاول مرة أخرى."}` }]); setFaceState("idle"); }
     finally { setChatPending(false); }

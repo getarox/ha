@@ -129,6 +129,11 @@ export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
 }
 
 export async function runImageStudio(input: ImageStudioInput) {
+  if (input.prompt.trim().length < 2 || input.prompt.length > 4000) throw new TRPCError({ code: "BAD_REQUEST", message: "وصف الصورة غير صالح." });
+  if (input.imageBase64) {
+    if (input.imageBase64.length > 6_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الصورة كبير جدًا. استخدم صورة أقل من 4MB." });
+    if (input.mimeType && !["image/png", "image/jpeg", "image/webp"].includes(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: "نوع الصورة غير مدعوم." });
+  }
   const quotaCheck = await checkImageQuota(input.sessionId, Boolean(input.pro));
   const model = getImageStudioModel(input.mode, Boolean(input.pro));
   let provider = "groq";
