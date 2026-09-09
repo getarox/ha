@@ -8,11 +8,17 @@ import {
   Bot,
   BrainCircuit,
   CheckCircle2,
+  Flag,
+  History,
+  LifeBuoy,
+  LogIn,
+  LogOut,
   Menu,
   Radio,
   ShieldCheck,
   Sparkles,
   Zap,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -58,9 +64,25 @@ export default function Home() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [paymentPending, setPaymentPending] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<"support" | "bug">("support");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const status = faceCopy[faceState];
   const messageCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
+  const submitFeedback = async () => {
+    if (feedbackMessage.trim().length < 3 || feedbackSending) return;
+    setFeedbackSending(true);
+    try {
+      const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: feedbackCategory, message: feedbackMessage.trim(), sessionId }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "تعذر إرسال الطلب.");
+      setFeedbackMessage(""); setFeedbackOpen(false); window.alert(data.message || "تم استلام طلبك.");
+    } catch (error: any) { window.alert(error?.message || "تعذر إرسال الطلب."); }
+    finally { setFeedbackSending(false); }
+  };
 
   useEffect(() => {
     void fetch(`/api/wallet?sessionId=${encodeURIComponent(sessionId)}`)
@@ -160,9 +182,11 @@ export default function Home() {
           <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
           {user?.role === "admin" ? <Link href="/owner" className="hidden sm:block"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">لوحة المالك</Button></Link> : null}
           <Button variant="ghost" size="icon" className="text-slate-300" aria-label="فتح القائمة" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Menu className="h-5 w-5" /></Button>
-          {menuOpen && <div className="absolute end-5 top-16 z-40 w-56 rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-3 text-sm text-slate-200 shadow-2xl backdrop-blur-xl">{user ? <button type="button" className="block w-full rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => void logout()}>تسجيل الخروج</button> : <button type="button" className="block w-full rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => startLogin()}>تسجيل الدخول</button>}<a className="block rounded-lg px-3 py-2 hover:bg-white/10" href="#conversation">الدعم والإبلاغ عن مشكلة</a><a className="block rounded-lg px-3 py-2 hover:bg-white/10" href="#plans">الخطط</a></div>}
+          {menuOpen && <div className="absolute end-5 top-16 z-40 w-64 rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-3 text-sm text-slate-200 shadow-2xl backdrop-blur-xl">{user ? <button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => void logout()}><LogOut className="size-4 text-cyan-300" />تسجيل الخروج</button> : <button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => startLogin()}><LogIn className="size-4 text-cyan-300" />تسجيل الدخول</button>}<button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => { setFeedbackCategory("support"); setFeedbackOpen(true); setMenuOpen(false); }}><LifeBuoy className="size-4 text-cyan-300" />الدعم</button><button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => { setFeedbackCategory("bug"); setFeedbackOpen(true); setMenuOpen(false); }}><Flag className="size-4 text-cyan-300" />الإبلاغ عن مشكلة</button><button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right hover:bg-white/10" onClick={() => { setHistoryOpen(true); setMenuOpen(false); }}><History className="size-4 text-cyan-300" />سجل الجلسات / المحادثات</button><a className="block rounded-lg px-3 py-2 hover:bg-white/10" href="#plans">الخطط</a></div>}
         </div>
       </header>
+
+      {(feedbackOpen || historyOpen) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-2xl border border-cyan-300/20 bg-slate-950 p-5 text-slate-100 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">{feedbackOpen ? (feedbackCategory === "bug" ? "الإبلاغ عن مشكلة" : "الدعم") : "سجل الجلسات / المحادثات"}</h2><Button variant="ghost" size="icon" onClick={() => { setFeedbackOpen(false); setHistoryOpen(false); }} aria-label="إغلاق"><X className="size-4" /></Button></div>{feedbackOpen ? <><textarea value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="اكتب طلبك أو تفاصيل المشكلة..." className="min-h-28 w-full rounded-lg border border-white/10 bg-white/5 p-3 text-sm outline-none" /><Button type="button" onClick={() => void submitFeedback()} disabled={feedbackSending || feedbackMessage.trim().length < 3} className="mt-3 w-full">{feedbackSending ? "جارٍ الإرسال..." : "إرسال إلى /api/feedback"}</Button></> : <div className="max-h-72 overflow-auto">{(() => { try { const items = JSON.parse(localStorage.getItem("aurevion-session-history") || "[]") as Array<{ title?: string; date?: string; count?: number }>; return items.length ? items.map((item, index) => <div key={`${item.date}-${index}`} className="mb-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs"><p>{item.title || "جلسة AUREVION"}</p><p className="mt-1 text-slate-500">{item.date ? new Date(item.date).toLocaleString("ar-IQ") : ""} · {item.count ?? 0} رسالة</p></div>) : <p className="text-sm text-slate-500">لا توجد جلسات محفوظة بعد. السجل محفوظ محلياً.</p>; } catch { return <p className="text-sm text-slate-500">تعذر قراءة السجل المحلي.</p>; } })()}</div>}</div></div>}
 
       <main className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-16 lg:px-8">
         <section id="brain" className="grid min-h-[620px] items-center gap-12 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:py-20">
