@@ -56,6 +56,7 @@ export type AIChatBoxProps = {
   onGenerateImage?: (prompt: string) => void | Promise<void>;
   onAnalyzeImage?: (imageDataUrl: string, prompt: string) => void | Promise<void>;
   voicePreset?: "female" | "male" | "calm";
+  developerMode?: boolean;
 };
 
 export function AIChatBox({
@@ -70,6 +71,7 @@ export function AIChatBox({
   onGenerateImage,
   onAnalyzeImage,
   voicePreset = "female",
+  developerMode = false,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -291,6 +293,7 @@ export function AIChatBox({
       </div>
 
       <form ref={inputAreaRef} onSubmit={handleSubmit} className="relative flex flex-col gap-3 border-t bg-background/50 p-4">
+        {developerMode && <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 px-3 py-2 text-[11px] text-amber-100">وضع المطور مفعل — لا يتم عرض مفاتيح أو بيانات سرية. الملفات المحددة: {selectedFiles.length}.</div>}
 
 
 
