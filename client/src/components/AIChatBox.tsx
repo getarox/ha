@@ -54,6 +54,7 @@ export type AIChatBoxProps = {
   emptyStateMessage?: string;
   suggestedPrompts?: string[];
   onGenerateImage?: (prompt: string) => void | Promise<void>;
+  onAnalyzeImage?: (imageDataUrl: string, prompt: string) => void | Promise<void>;
   voicePreset?: "female" | "male" | "calm";
 };
 
@@ -67,6 +68,7 @@ export function AIChatBox({
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
   onGenerateImage,
+  onAnalyzeImage,
   voicePreset = "female",
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
@@ -194,14 +196,23 @@ export function AIChatBox({
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedInput = input.trim();
     if ((!trimmedInput && selectedFiles.length === 0) || isLoading) return;
-    const attachmentNote = selectedFiles.length
-      ? `\n\n[مرفقات محلية: ${selectedFiles.map((file) => file.name).join(", ")}]`
-      : "";
-    onSendMessage(`${trimmedInput || "أرفقت ملفات للمراجعة."}${attachmentNote}`);
+    const files = [...selectedFiles];
+    const textFiles = files.filter((file) => !file.type.startsWith("image/")).slice(0, 3);
+    const textParts = await Promise.all(textFiles.map(async (file) => `${file.name}:\n${(await file.text()).slice(0, 5000)}`));
+    const attachmentText = textParts.length ? `\n\n[محتوى المرفقات]\n${textParts.join("\n\n")}` : "";
+    const imageFile = files.find((file) => file.type.startsWith("image/"));
+    if (imageFile && onAnalyzeImage) {
+      const imageDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error("تعذر قراءة الصورة.")); reader.readAsDataURL(imageFile); });
+      const prompt = trimmedInput || "حلل هذه الصورة واذكر أهم التفاصيل والملاحظات.";
+      setInput(""); setSelectedFiles([]); setRecordingStatus("جارٍ تحليل الصورة…");
+      await onAnalyzeImage(imageDataUrl, prompt);
+      return;
+    }
+    onSendMessage(`${trimmedInput || "أرفقت ملفات للمراجعة."}${attachmentText}`);
     setInput("");
     setSelectedFiles([]);
     scrollToBottom();
