@@ -26,7 +26,7 @@ export async function chat(req: VercelRequest, res: VercelResponse) {
   try { return res.status(200).json(await chatWithAurevion(body)); } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : 502; return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." }); }
 }
 export async function image(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const body = req.body || {};
+  if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const body = req.body || {};
   if (typeof body.sessionId !== "string" || typeof body.mode !== "string" || typeof body.prompt !== "string") return res.status(400).json({ error: "بيانات عملية الصورة غير صالحة." });
   if (!["generate", "edit", "analyze", "evaluate"].includes(body.mode)) return res.status(400).json({ error: "وضع الصورة غير صالح." });
   try { return res.status(200).json(await runImageStudio({ sessionId: body.sessionId, mode: body.mode, prompt: body.prompt, imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined, mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined, pro: Boolean(body.pro) })); } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر تنفيذ عملية الصور حاليًا." }); }
@@ -37,7 +37,7 @@ function raw(req: VercelRequest) { const body = (req as any).rawBody; return Buf
 export async function paymentCallback(req: VercelRequest, res: VercelResponse) { if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const sig = req.headers.signature ?? req.headers["x-signature"]; const signature = Array.isArray(sig) ? sig[0] : sig; if (!verifyPayTabsCallback(raw(req), signature)) return res.status(401).json({ error: "توقيع PayTabs غير صالح." }); try { return res.status(200).json(await settlePayTabsCallback(req.body ?? {})); } catch (e: any) { return res.status(400).json({ error: e?.message ?? "تعذر معالجة callback." }); } }
 export async function paymentReturn(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, message: "تم استلام نتيجة الدفع. سيتم تحديث الرصيد عبر callback الآمن." }); }
 export async function voice(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
   const body = req.body ?? {};
   if (typeof body.text !== "string" || !body.text.trim()) return res.status(400).json({ error: "النص الصوتي مطلوب." });
   const voiceId = body.voiceId === "male" || body.voiceId === "calm" || body.voiceId === "female" ? undefined : typeof body.voiceId === "string" ? body.voiceId : undefined;
@@ -46,7 +46,7 @@ export async function voice(req: VercelRequest, res: VercelResponse) {
   catch (error: any) { return res.status(502).json({ error: error?.message ?? "تعذر توليد الصوت حاليًا." }); }
 }
 export async function transcribe(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
   const body = req.body ?? {};
   if (typeof body.audioBase64 !== "string") return res.status(400).json({ error: "التسجيل الصوتي مطلوب." });
   try { return res.status(200).json(await transcribeAudio(body.audioBase64, typeof body.mimeType === "string" ? body.mimeType : "audio/webm")); }
