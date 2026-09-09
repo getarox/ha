@@ -5,6 +5,25 @@ import { AurevionSession, InsertAurevionFeedback, InsertUser, aurevionFeedback, 
 import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _schemaReady: Promise<void> | null = null;
+
+async function ensureOperationalSchema(pool: mysql.Pool) {
+  const statements = [
+    "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
+    "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
+    "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `imagesUsed` int NOT NULL DEFAULT 0",
+    "CREATE TABLE IF NOT EXISTS `wallets` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `balance` decimal(12,2) NOT NULL DEFAULT 0.00, `currency` varchar(3) NOT NULL DEFAULT 'SAR', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `wallets_id` PRIMARY KEY(`id`), CONSTRAINT `wallets_sessionKey_unique` UNIQUE(`sessionKey`))",
+    "CREATE TABLE IF NOT EXISTS `wallet_ledger` (`id` int AUTO_INCREMENT NOT NULL, `walletId` int NOT NULL, `reference` varchar(128) NOT NULL, `type` enum('credit','debit','refund','hold','release') NOT NULL, `amount` decimal(12,2) NOT NULL, `description` varchar(255), `createdAt` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `wallet_ledger_id` PRIMARY KEY(`id`), CONSTRAINT `wallet_ledger_reference_unique` UNIQUE(`reference`))",
+    "CREATE TABLE IF NOT EXISTS `payments` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `cartId` varchar(64) NOT NULL, `tranRef` varchar(128), `amount` decimal(12,2) NOT NULL, `currency` varchar(3) NOT NULL, `status` enum('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending', `redirectUrl` text, `rawResponse` text, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `payments_id` PRIMARY KEY(`id`), CONSTRAINT `payments_cartId_unique` UNIQUE(`cartId`))",
+    "CREATE TABLE IF NOT EXISTS `ai_usage` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `operation` varchar(32) NOT NULL, `provider` varchar(64) NOT NULL, `model` varchar(128), `amount` decimal(12,2) NOT NULL, `requestId` varchar(128), `createdAt` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `ai_usage_id` PRIMARY KEY(`id`), CONSTRAINT `ai_usage_requestId_unique` UNIQUE(`requestId`))",
+    "CREATE TABLE IF NOT EXISTS `pricing` (`id` int AUTO_INCREMENT NOT NULL, `operation` varchar(32) NOT NULL, `price` decimal(12,2) NOT NULL, `currency` varchar(3) NOT NULL DEFAULT 'SAR', `active` int NOT NULL DEFAULT 1, CONSTRAINT `pricing_id` PRIMARY KEY(`id`), CONSTRAINT `pricing_operation_unique` UNIQUE(`operation`))",
+    "CREATE TABLE IF NOT EXISTS `aurevion_feedback` (`id` int AUTO_INCREMENT NOT NULL, `category` enum('support','bug','safety','feedback') NOT NULL, `message` text NOT NULL, `sessionId` varchar(128), `userEmail` varchar(320), `status` enum('new','reviewing','resolved') NOT NULL DEFAULT 'new', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_feedback_id` PRIMARY KEY(`id`))",
+  ];
+  for (const statement of statements) {
+    try { await pool.query(statement); }
+    catch (error) { console.error("[Database] Schema statement failed:", error); throw error; }
+  }
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -17,8 +36,16 @@ export async function getDb() {
         user: decodeURIComponent(u.username),
         password: decodeURIComponent(u.password),
         database: decodeURIComponent(u.pathname.slice(1)),
+        connectionLimit: 5,
+        enableKeepAlive: true,
+        connectTimeout: 10_000,
         ssl: { rejectUnauthorized: true },
       });
+      _schemaReady = ensureOperationalSchema(client).catch((error) => {
+        _schemaReady = null;
+        throw error;
+      });
+      await _schemaReady;
       _db = drizzle({ client });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
