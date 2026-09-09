@@ -1,0 +1,122 @@
+AUREVION — توصيات التنفيذ والنشر اليدوي
+========================================
+
+Backend Production:
+https://aurevion-project.vercel.app/
+
+GitHub repository:
+https://github.com/getarox/ha
+
+المسؤوليات:
+- الوكيل يراجع ويصلح الكود ويرفع التعديلات إلى GitHub main.
+- المالك ينفذ أوامر Vercel يدوياً من Termux.
+- لا يتم تنفيذ دفع حقيقي أثناء الاختبار.
+- لا توضع أي أسرار داخل Git أو client أو APK.
+
+آخر تحسينات Backend المنفذة:
+- توحيد مسارات REST:
+  /api/health
+  /api/aurevion/health
+  /api/chat
+  /api/aurevion/chat
+  /api/image
+  /api/aurevion/image
+  /api/wallet
+  /api/payments/create
+  /api/payments/callback
+  /api/payments/return
+- إضافة timeout وإعادة محاولة للاتصال بـ Groq.
+- منع اختلاق الأخبار والبيانات الحديثة عند غياب مصدر قابل للتحقق.
+- إرجاع مصادر البحث داخل نتيجة الدردشة.
+- تقوية CORS لمسارات الدردشة والصور والصوت والتحويل الصوتي والبلاغات.
+- إضافة اختبارات REST للعقود والأخطاء.
+- تقوية إعداد اتصال MySQL/TiDB مع connection limit وkeep-alive وtimeout.
+- إضافة migration لجدول aurevion_feedback.
+- تحسين توافق المحفظة مع mysql2 وإرجاع أخطاء JSON واضحة.
+- Pollinations هو مزود الصور الأول وGemini احتياطي.
+- عدم تشغيل القراءة الصوتية تلقائياً؛ الصوت يبدأ بزر السماعة فقط.
+- التسجيل العادي يعمل بالضغط المستمر ويرسل عند رفع الإصبع.
+- الخطط ومكانها وأزرار 25 SAR و100 SAR لم تُنقل.
+
+فحوصات الوكيل:
+- pnpm check: ناجح.
+- pnpm test: ناجح، 16 اختباراً ناجحاً، واختباران متوقفان بسبب غياب مفاتيح الأسرار في بيئة الاختبار.
+- pnpm build: ناجح.
+- git diff --check: ناجح.
+
+أوامر Termux بعد سحب آخر نسخة:
+
+pkg update -y
+pkg upgrade -y
+pkg install -y git nodejs-lts
+npm install -g pnpm
+cd ~
+rm -rf ha
+git clone https://github.com/getarox/ha.git
+cd ha
+pnpm install --frozen-lockfile
+cp .env.example .env
+nano .env
+pnpm check
+pnpm test
+pnpm build
+NODE_ENV=production pnpm start
+
+متغيرات Vercel المطلوبة من لوحة Vercel فقط:
+- DATABASE_URL
+- GROQ_API_KEY
+- GEMINI_API_KEY
+- POLLINATIONS_API_KEY عند الحاجة
+- POLLINATIONS_ENDPOINT
+- POLLINATIONS_MODEL
+- GROQ_STT_MODEL
+- AUREVION_ALLOWED_ORIGINS
+- OFFICIAL_SITE_URL
+- AUREVION_OFFICIAL_SITE_URL
+- PAYTABS_PROFILE_ID
+- PAYTABS_SERVER_KEY
+- PAYTABS_ENDPOINT
+- PAYTABS_CALLBACK_URL=https://aurevion-project.vercel.app/api/payments/callback
+- PAYTABS_RETURN_URL=https://aurevion-project.vercel.app/api/payments/return
+- WALLET_CURRENCY=SAR
+- AUREVION_WALLET_ENFORCE=false أثناء الاختبار
+- AUREVION_FREE_IMAGE_LIMIT=5
+- AUREVION_PRO_IMAGE_LIMIT=100
+- BRAVE_SEARCH_API_KEY عند توفره
+- SEARXNG_URL عند توفره
+- GOOGLE_API_KEY وGOOGLE_SEARCH_CX عند استخدام Google Search
+
+لا تضع قيم الأسرار داخل هذا الملف أو GitHub.
+
+أوامر فحص Backend Production بعد النشر:
+
+BASE="https://aurevion-project.vercel.app"
+curl -i "$BASE/api/health"
+curl -i "$BASE/api/aurevion/health"
+curl -i "$BASE/api/wallet?sessionId=acceptance-check-12345"
+curl -i -X POST "$BASE/api/chat" \
+  -H 'Content-Type: application/json' \
+  --data '{"sessionId":"acceptance-check-12345","messages":[{"role":"user","content":"من أنت؟"}],"webSearch":false}'
+
+اختبار البحث الحديث:
+
+curl -i -X POST "$BASE/api/chat" \
+  -H 'Content-Type: application/json' \
+  --data '{"sessionId":"acceptance-search-12345","messages":[{"role":"user","content":"ما آخر الأخبار التقنية اليوم؟"}],"webSearch":true}'
+
+النتيجة الصحيحة:
+- رد JSON.
+- عند توفر بحث: searched=true ومصفوفة sources.
+- عند عدم توفر مصدر: رسالة واضحة بعدم القدرة على التأكيد، بدون اختلاق.
+
+اختبار الصور بدون دفع:
+- استخدم الواجهة فقط أو POST إلى /api/image.
+- لا تستخدم pro=true إلا مع خطة مفعلة.
+- لا تنفذ أي طلب PayTabs حقيقي أثناء القبول.
+
+ملاحظات Production الحالية:
+- رابط الدردشة والـ Backend هو https://aurevion-project.vercel.app/.
+- إذا بقيت مسارات Vercel القديمة بعد النشر، تحقق من Project Settings > Root Directory، ومن أن المشروع مربوط بمستودع getarox/ha والفرع main.
+- نفّذ Redeploy من آخر commit في main بعد ضبط متغيرات البيئة.
+- يجب أن تكون قيمة PAYTABS_CALLBACK_URL وPAYTABS_RETURN_URL على نفس رابط Backend أعلاه.
+- لا تعتبر نجاح build وحده كافياً؛ نفّذ curl والاختبار اليدوي للواجهة.
