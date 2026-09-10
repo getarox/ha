@@ -116,11 +116,10 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
 async function callPollinationsImage(input: ImageStudioInput) {
   const endpoint = ENV.pollinationsEndpoint.replace(/\/$/, "");
   const url = `${endpoint}/${encodeURIComponent(input.prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
-  const response = await fetch(url, { headers: ENV.pollinationsApiKey ? { Authorization: `Bearer ${ENV.pollinationsApiKey}` } : {}, signal: AbortSignal.timeout(60_000) });
+  let response = await fetch(url, { headers: ENV.pollinationsApiKey ? { Authorization: `Bearer ${ENV.pollinationsApiKey}` } : {}, signal: AbortSignal.timeout(60_000) });
+  if ((response.status === 401 || response.status === 403) && ENV.pollinationsApiKey) response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!response.ok) throw new Error(`Pollinations image request failed: ${response.status}`);
-  const mime = response.headers.get("content-type")?.split(";")[0] || "image/png";
-  const data = Buffer.from(await response.arrayBuffer()).toString("base64");
-  return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: `data:${mime};base64,${data}` };
+  return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: url };
 }
 
 export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
