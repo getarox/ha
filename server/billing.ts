@@ -37,7 +37,13 @@ export async function createPayTabsPayment(input: { sessionKey: string; amount: 
     method: "POST", headers: { Authorization: ENV.paytabsServerKey, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(30_000),
   });
   const result = await response.json().catch(() => ({})) as Record<string, unknown>;
-  if (!response.ok || typeof result.redirect_url !== "string") throw new Error(String(result.message ?? "تعذر إنشاء عملية الدفع."));
+  if (!response.ok || typeof result.redirect_url !== "string") {
+    const upstreamMessage = String(result.message ?? result.error ?? "");
+    if (/application\/octet-stream|mobile authentication|mobile key/i.test(upstreamMessage)) {
+      throw new Error("مفتاح PayTabs المستخدم من نوع Mobile. أنشئ Standard Web Authentication Key من لوحة PayTabs وضعه في PAYTABS_SERVER_KEY.");
+    }
+    throw new Error(upstreamMessage || "تعذر إنشاء عملية الدفع.");
+  }
   const db = await getDb();
   if (db) await db.insert(payments).values({ sessionKey: input.sessionKey, cartId: id, tranRef: typeof result.tran_ref === "string" ? result.tran_ref : undefined, amount: money(input.amount).toFixed(2), currency: ENV.walletCurrency, redirectUrl: result.redirect_url, rawResponse: JSON.stringify(result) });
   return { cartId: id, redirectUrl: result.redirect_url, tranRef: result.tran_ref };

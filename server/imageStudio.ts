@@ -113,11 +113,34 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
   return { kind: "text" as const, text: payload.choices?.[0]?.message?.content ?? "لم أستطع استخراج تقييم من الصورة." };
 }
 
+async function enhanceImagePrompt(prompt: string) {
+  if (!ENV.groqApiKey || process.env.NODE_ENV === "test") return prompt;
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ENV.groqApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: ENV.groqModel, temperature: 0.35, max_tokens: 700, messages: [
+        { role: "system", content: "You are a professional image prompt engineer. Rewrite the user's request into one precise, vivid English prompt for an image generator. Preserve every requested subject, action, setting, culture, and mood. Never add people, genders, text, logos, or objects that were not requested. If the subject is a cat, explicitly say cat, never scene or woman. Return only the final prompt, no explanation." },
+        { role: "user", content: prompt },
+      ] }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return prompt;
+    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const enhanced = payload.choices?.[0]?.message?.content?.trim();
+    return enhanced && enhanced.length >= 10 && enhanced.length <= 4000 ? enhanced : prompt;
+  } catch (error) {
+    console.warn("[ImageStudio] Prompt enhancement unavailable; using original prompt", error);
+    return prompt;
+  }
+}
+
 async function callPollinationsImage(input: ImageStudioInput) {
   const endpoint = "https://image.pollinations.ai/prompt";
-  const prompt = /لقطة|قطه/i.test(input.prompt)
+  const clarifiedPrompt = /لقطة|قطه/i.test(input.prompt)
     ? `${input.prompt.replace(/لقطة|قطه/gi, "قطة")}، قطة حقيقية نائمة بوضوح، بدون أي أشخاص أو نساء أو وجوه بشرية`
     : input.prompt;
+  const prompt = await enhanceImagePrompt(clarifiedPrompt);
   const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
   return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: url };
 }
