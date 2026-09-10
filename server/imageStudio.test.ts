@@ -96,7 +96,7 @@ describe("AUREVION image studio", () => {
     const sessionId = `quota-free-${Date.now()}`;
     for (let index = 0; index < 3; index += 1) await runImageStudio({ sessionId, mode: "generate", prompt: "صورة اختبار" });
     await expect(runImageStudio({ sessionId, mode: "generate", prompt: "صورة رابعة" })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
-    expect(fetchMock).toHaveBeenCalledTimes(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("returns TOO_MANY_REQUESTS after the Pro image quota is exhausted", async () => {

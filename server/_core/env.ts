@@ -32,7 +32,7 @@ export const ENV = {
   imagePrice: process.env.AUREVION_IMAGE_PRICE ?? "0.50",
   walletEnforce: process.env.AUREVION_WALLET_ENFORCE === "true",
   pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "",
-  pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://image.pollinations.ai/prompt",
+  pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://gen.pollinations.ai/image",
   pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   googleApiKey: process.env.GOOGLE_API_KEY ?? "",
