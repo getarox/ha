@@ -121,7 +121,7 @@ export function AIChatBox({
   };
 
   const handleRecordToggle = async () => {
-    if (isRecording) {
+    if (recorderRef.current?.state === "recording" || isRecording) {
       recorderRef.current?.stop();
       return;
     }
@@ -141,13 +141,14 @@ export function AIChatBox({
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         setIsRecording(false);
-        setRecordingStatus("جارٍ تجهيز التسجيل للإرسال…");
+        recorderRef.current = null;
+        audioChunksRef.current = [];
         stream.getTracks().forEach((track) => track.stop());
         void sendRecordedAudio(blob);
       };
       recorder.start();
       setIsRecording(true);
-      setRecordingStatus("جارٍ التسجيل… ارفع إصبعك لإرسال التسجيل مباشرة.");
+      setRecordingStatus("");
     } catch {
       setRecordingStatus("لم نتمكن من الوصول إلى الميكروفون. اسمح باستخدام الميكروفون ثم حاول مرة أخرى.");
     }
@@ -239,7 +240,6 @@ export function AIChatBox({
 
   const sendRecordedAudio = async (recordedBlob: Blob) => {
     if (isLoading) return;
-    setRecordingStatus("جارٍ تحويل التسجيل إلى نص…");
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
@@ -247,7 +247,7 @@ export function AIChatBox({
         const response = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audioBase64: encoded, mimeType: recordedBlob.type }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "تعذر تحويل التسجيل إلى نص.");
-        if (data.text) { onSendMessage(data.text); setRecordingStatus("تم إرسال التسجيل."); }
+        if (data.text) onSendMessage(data.text);
       } catch (error: any) { setRecordingStatus(error?.message || "تعذر إرسال التسجيل."); }
     };
     reader.readAsDataURL(recordedBlob);
@@ -299,7 +299,7 @@ export function AIChatBox({
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFiles} />
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={() => fileInputRef.current?.click()} aria-label="إرفاق ملفات"><Paperclip className="size-4" /></Button>
           {onGenerateImage && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-cyan-300" onClick={handleGenerateImage} aria-label="إنشاء صورة من الوصف" title="إنشاء صورة من الوصف"><ImagePlus className="size-4" /></Button>}
-          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); void handleRecordToggle(); }} onPointerUp={(event) => { event.currentTarget.releasePointerCapture?.(event.pointerId); if (isRecording) void handleRecordToggle(); }} onPointerCancel={() => { if (isRecording) void handleRecordToggle(); }} onPointerLeave={(event) => { if (isRecording && event.buttons === 0) void handleRecordToggle(); }} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !isRecording) { event.preventDefault(); void handleRecordToggle(); } }} onKeyUp={(event) => { if ((event.key === "Enter" || event.key === " ") && isRecording) { event.preventDefault(); void handleRecordToggle(); } }} aria-label={isRecording ? "ارفع إصبعك لإرسال التسجيل" : "اضغط باستمرار للتسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
+          <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isRecording && "bg-red-400/15 text-red-300 hover:text-red-200")} onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); void handleRecordToggle(); }} onPointerUp={(event) => { event.currentTarget.releasePointerCapture?.(event.pointerId); if (recorderRef.current?.state === "recording") void handleRecordToggle(); }} onPointerCancel={() => { if (recorderRef.current?.state === "recording") void handleRecordToggle(); }} onPointerLeave={(event) => { if (recorderRef.current?.state === "recording" && event.buttons === 0) void handleRecordToggle(); }} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && !isRecording) { event.preventDefault(); void handleRecordToggle(); } }} onKeyUp={(event) => { if ((event.key === "Enter" || event.key === " ") && recorderRef.current?.state === "recording") { event.preventDefault(); void handleRecordToggle(); } }} aria-label={isRecording ? "ارفع إصبعك لإرسال التسجيل" : "اضغط باستمرار للتسجيل"} aria-pressed={isRecording}>{isRecording ? <Square className="size-3.5 fill-current" /> : <Mic className="size-4" />}</Button>
           <Button type="button" variant="ghost" size="icon" className={cn("h-8 w-8 text-muted-foreground hover:text-cyan-300", isVoiceChatting && "bg-cyan-300/15 text-cyan-200")} onClick={handleVoiceChat} aria-label="محادثة صوتية لمدة خمس دقائق" aria-pressed={isVoiceChatting}><MessageCircle className="size-4" /></Button>
         </div><div className="flex items-center gap-2 text-[10px] text-slate-500">{selectedFiles.length > 0 && <span className="max-w-32 truncate text-cyan-200">{selectedFiles.length} مرفق</span>}</div></div>
 
