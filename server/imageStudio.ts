@@ -116,9 +116,6 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
 async function callPollinationsImage(input: ImageStudioInput) {
   const endpoint = ENV.pollinationsEndpoint.replace(/\/$/, "");
   const url = `${endpoint}/${encodeURIComponent(input.prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
-  let response = await fetch(url, { headers: ENV.pollinationsApiKey ? { Authorization: `Bearer ${ENV.pollinationsApiKey}` } : {}, signal: AbortSignal.timeout(60_000) });
-  if ((response.status === 401 || response.status === 403) && ENV.pollinationsApiKey) response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-  if (!response.ok) throw new Error(`Pollinations image request failed: ${response.status}`);
   return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: url };
 }
 
@@ -139,9 +136,10 @@ export async function runImageStudio(input: ImageStudioInput) {
   let result;
   if (input.mode === "analyze" || input.mode === "evaluate") {
     result = await callGroqVision(input, model);
+  } else if (input.mode === "generate" && !input.pro) {
+    result = await callPollinationsImage(input); provider = "pollinations";
   } else {
-    try { result = await callPollinationsImage(input); provider = "pollinations"; }
-    catch (error) { console.warn("[ImageStudio] Pollinations failed; using Gemini fallback", error); result = await callGeminiImage(input, model); provider = "gemini"; }
+    result = await callGeminiImage(input, model); provider = "gemini";
   }
   const isHeavyTask = input.mode !== "generate" || Boolean(input.pro);
   if ((ENV.walletEnforce || isHeavyTask) && process.env.NODE_ENV !== "test") {
