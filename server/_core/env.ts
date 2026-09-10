@@ -1,3 +1,13 @@
+function cleanSecret(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/^Bearer\s+/i, "")
+    .replace(/^echo\s+/i, "")
+    .trim()
+    .replace(/[\r\n]/g, "");
+}
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
@@ -31,7 +41,7 @@ export const ENV = {
   chatPrice: process.env.AUREVION_CHAT_PRICE ?? "0.10",
   imagePrice: process.env.AUREVION_IMAGE_PRICE ?? "0.50",
   walletEnforce: process.env.AUREVION_WALLET_ENFORCE === "true",
-  pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "",
+  pollinationsApiKey: cleanSecret(process.env.POLLINATIONS_API_KEY),
   pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://gen.pollinations.ai/image",
   pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
