@@ -17,5 +17,7 @@ describe("server image intent", () => {
     expect(resolveServerImageIntent("ما هو أفضل تصميم لموقع؟")).toBeNull();
     expect(resolveServerImageIntent("ابحث عن صورة قطة")).toBeNull();
     expect(resolveServerImageIntent("ما هي الصورة المناسبة للهوية؟")).toBeNull();
+    expect(resolveServerImageIntent("هذه صورة جميلة")).toBeNull();
+    expect(resolveServerImageIntent("لدي صورة في هاتفي")).toBeNull();
   });
 });

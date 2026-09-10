@@ -136,7 +136,7 @@ async function enhanceImagePrompt(prompt: string) {
 }
 
 async function callPollinationsImage(input: ImageStudioInput) {
-  const endpoint = "https://image.pollinations.ai/prompt";
+  const endpoint = ENV.pollinationsEndpoint.replace(/\/+$/, "");
   const clarifiedPrompt = /لقطة|قطه/i.test(input.prompt)
     ? `${input.prompt.replace(/لقطة|قطه/gi, "قطة")}، قطة حقيقية نائمة بوضوح، بدون أي أشخاص أو نساء أو وجوه بشرية`
     : input.prompt;

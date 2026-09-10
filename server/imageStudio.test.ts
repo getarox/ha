@@ -39,6 +39,7 @@ describe("AUREVION image studio", () => {
     const generatedUrl = decodeURIComponent(String(result.imageDataUrl));
     expect(generatedUrl).toContain("قطة حقيقية نائمة");
     expect(generatedUrl).toContain("بدون أي أشخاص");
+    expect(String(result.imageDataUrl)).toContain("model=flux");
   });
 
   it("runs Groq Pro for a persisted Pro session without exposing the API key", async () => {

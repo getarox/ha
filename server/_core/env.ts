@@ -43,7 +43,7 @@ export const ENV = {
   walletEnforce: process.env.AUREVION_WALLET_ENFORCE === "true",
   pollinationsApiKey: cleanSecret(process.env.POLLINATIONS_API_KEY),
   pollinationsEndpoint: process.env.POLLINATIONS_ENDPOINT ?? "https://image.pollinations.ai/prompt",
-  pollinationsModel: process.env.POLLINATIONS_MODEL ?? "flux",
+  pollinationsModel: "flux",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   googleApiKey: process.env.GOOGLE_API_KEY ?? "",
   googleSearchCx: process.env.GOOGLE_SEARCH_CX ?? "",
