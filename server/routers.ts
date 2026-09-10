@@ -62,7 +62,6 @@ export const appRouter = router({
       const stats = await getAurevionSessionStats();
       return {
         identity: "أوريفون — عقل روبوتي مفتوح المصدر مبني على Groq لهاتف AUREVION",
-        developer: "حارث عبدالله الجبوري",
         officialSiteUrl: ENV.officialSiteUrl,
         model: ENV.groqModel,
         plans: [
