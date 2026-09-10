@@ -110,6 +110,8 @@ export default function Home() {
   };
 
   const handleSend = (content: string) => {
+    const asksForImage = /(?:صورة|صور|شعار|بوستر|ملصق|image|images|logo|poster)/i.test(content) && /(?:أنشئ|انشئ|إنشاء|انشاء|صمم|تصميم|ارسم|رسم|ولّد|ولد|generate|create|design|draw)/i.test(content);
+    if (asksForImage) { void handleGenerateImage(content); return; }
     const nextMessages: Message[] = [...messages, { role: "user", content }];
     const requestMessages = nextMessages.filter(
       (message): message is { role: "user" | "assistant"; content: string } => message.role !== "system",
