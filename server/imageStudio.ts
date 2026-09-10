@@ -142,7 +142,8 @@ export async function runImageStudio(input: ImageStudioInput) {
     result = await callGeminiImage(input, model); provider = "gemini";
   }
   const isHeavyTask = input.mode !== "generate" || Boolean(input.pro);
-  if ((ENV.walletEnforce || isHeavyTask) && process.env.NODE_ENV !== "test") {
+  const requiresWalletCharge = provider !== "pollinations" && (ENV.walletEnforce || isHeavyTask);
+  if (requiresWalletCharge && process.env.NODE_ENV !== "test") {
     try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
     catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
   }
