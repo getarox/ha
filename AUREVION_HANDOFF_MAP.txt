@@ -1,0 +1,196 @@
+AUREVION — خريطة التسليم للوكيل التالي
+========================================
+
+تاريخ آخر تحديث: 2026-09-10
+المستودع: https://github.com/getarox/ha
+الفرع: main
+آخر Commit: 30c1e27
+حالة المستودع عند التسليم: نظيف ومتزامن مع origin/main.
+
+1) حالة الحفظ
+------------
+كل التعديلات البرمجية الأخيرة محفوظة في مستودع GitHub داخل الفرع main، وليست مجرد تعديلات محلية مؤقتة.
+آخر سلسلة تعديلات مهمة محفوظة هي:
+
+30c1e27  Enhance image prompts and clarify PayTabs key errors
+8727cc2  Clarify Arabic cat image prompts
+77a0d06  Hide sidebar contents completely when closed
+ceac5a5  Allow free Pollinations images without wallet balance
+e8efa94  Detect natural language image requests server-side
+e1a9364  Use direct Pollinations image URLs for free generation
+92a6e5a  Normalize Pollinations API key environment values
+c0f77c9  Use official Pollinations authenticated image API
+
+2) ما تم إنجازه
+---------------
+أ) الدردشة وتوجيه الصور
+تمت إضافة توجيه Server-Side داخل server/httpHandlers.ts. آخر رسالة في /api/chat تمر عبر server/imageIntent.ts قبل محرك الدردشة.
+طلبات إنشاء الصور تتحول إلى image mode generate.
+طلبات تعديل صورة مرفقة تتحول إلى edit.
+طلبات تحليل صورة مرفقة تتحول إلى analyze.
+الأسئلة العادية والبحث عن صور لا تتحول إلى مولد الصور.
+يعمل المسار مع الويب وREST وTermux والعملاء المستقبليين.
+
+ب) فهم صيغ طلب الصور
+تم توسيع server/imageIntent.ts ليدعم العربية والإنجليزية وصيغاً طبيعية مثل:
+صورة لمدينة مستقبلية بإضاءة نيون
+أحتاج بوستر لفيلم خيال علمي
+أريد شعاراً للمشروع
+show me a futuristic visual
+make me a cyberpunk scene
+تم استثناء كلمات البحث والتحليل والتعديل والأسئلة الاعتيادية.
+
+ج) تحسين Prompt بالذكاء الاصطناعي
+داخل server/imageStudio.ts توجد دالة enhanceImagePrompt.
+تستخدم Groq لإعادة كتابة طلب الصورة إلى Prompt إنجليزي احترافي.
+تحافظ على الموضوع والمكان والمزاج والثقافة المطلوبة.
+تمنع إضافة أشخاص أو عناصر غير مطلوبة.
+تستخدم النص الأصلي تلقائياً إذا فشل Groq أو لم يكن متاحاً.
+في حالة طلب القطط، يتم تصحيح لقطة/قطه إلى قطة وإضافة قيود تمنع النساء والوجوه والأشخاص غير المطلوبين.
+
+د) Pollinations
+الصور المجانية تستخدم الرابط المباشر:
+https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&nologo=true
+لا يتم إرسال Authorization Header للصور المجانية.
+لا يتم طلب رصيد المحفظة للصور المجانية.
+تم إبقاء Pollinations API key في البيئة تحسباً للمسارات المستقبلية، لكنه ليس ضرورياً لمسار الرابط المجاني الحالي.
+
+هـ) واجهة عرض الصور
+يستخدم AIChatBox عارض ImageAttachment.
+يظهر Skeleton أثناء تحميل الصورة.
+تظهر الصورة تدريجياً بعد اكتمال التحميل.
+تظهر رسالة مفهومة عند فشل تحميل الصورة.
+تم تقليل احتمال الشاشة السوداء والوميض.
+
+و) التسجيل الصوتي
+زر الميكروفون يعمل بنمط الضغط والاستمرار ثم الإفلات.
+يبدأ التسجيل عند الضغط.
+يتوقف ويرسل التسجيل آلياً عند رفع الإصبع.
+لا توجد معاينة أو تأكيد إضافي.
+بقية أزرار شريط المحادثة لم تتغير.
+
+ز) القائمة الجانبية
+زر الثلاث شرطات يفتح Sidebar جانبية.
+القائمة مخفية افتراضياً.
+عند الإغلاق تستخدم visibility وopacity وpointer-events لمنع ظهور المحتوى أو بقاء عناصر خافتة في الزاوية.
+زر الثلاث شرطات يبقى ظاهراً.
+تم حذف Developer Mode من الواجهة والـBackend الخاص بـownerStats.
+
+ح) المحفظة والدفع
+الصور المجانية عبر Pollinations لا تخصم من المحفظة.
+المهام المدفوعة مثل Pro والتحليل والتعديل تبقى خاضعة لشروط المحفظة حسب الإعدادات.
+تم منع تكرار callback في PayTabs والتحقق من المبلغ والعملة والتوقيع.
+تم تحسين رسالة خطأ PayTabs عندما يكون المفتاح Mobile بدل Standard Web.
+
+3) الملفات الأساسية
+-------------------
+server/imageIntent.ts       محلل نية الصور Server-Side.
+server/imageIntent.test.ts  اختبارات نية الصور.
+server/imageStudio.ts       محرك الصور وGroq Prompt Enhancement وPollinations.
+server/imageStudio.test.ts اختبارات محرك الصور والحصص.
+server/httpHandlers.ts      REST handlers للدردشة والصور والدفع.
+server/billing.ts           PayTabs والمحفظة والخصم والـcallback.
+server/_core/env.ts         قراءة وتنظيف Environment Variables.
+client/src/pages/Home.tsx   واجهة المحادثة والقائمة الجانبية وتوجيه النتائج.
+client/src/components/AIChatBox.tsx شريط الدردشة والتسجيل وImageAttachment.
+client/src/pages/Owner.tsx  لوحة المالك.
+api/aurevion/chat.ts        مسار Vercel الصريح للدردشة.
+api/aurevion/image.ts       مسار Vercel الصريح للصور.
+api/payments/create.ts     مسار إنشاء الدفع.
+api/payments/callback.ts   مسار PayTabs callback.
+api/payments/return.ts     مسار PayTabs return.
+
+4) Environment Variables المطلوبة
+----------------------------------
+POLLINATIONS_API_KEY
+القيمة يجب أن تكون المفتاح فقط. لا تضع echo أو Bearer أو علامات اقتباس.
+المسار المجاني الحالي لا يعتمد عليه، لكن يفضل إبقاؤه مضبوطاً للمسارات المدفوعة أو المستقبلية.
+
+GROQ_API_KEY
+مطلوب لتحسين Prompt وللدردشة والتحليل حسب إعدادات المشروع.
+
+GEMINI_API_KEY
+مطلوب لمسارات Gemini Pro أو fallback الخاصة بالصور.
+
+PAYTABS_PROFILE_ID
+PAYTABS_SERVER_KEY
+يجب أن يكون PAYTABS_SERVER_KEY هو Standard Web Authentication Key، وليس Mobile Authentication Key.
+خطأ PayTabs التالي يدل غالباً على مفتاح Mobile:
+Request must be type application/octet-stream
+
+AUREVION_WALLET_ENFORCE
+إذا كان true فالدفع يطبق على المهام المدفوعة فقط، ولا يفرض رصيداً على Pollinations المجاني بعد الإصلاح الأخير.
+
+5) الفحوصات الأخيرة
+--------------------
+آخر فحص ناجح:
+pnpm check
+pnpm test
+pnpm build
+git diff --check
+
+النتيجة:
+26 tests passed.
+2 tests skipped بسبب اختبارات أسرار مزودي الخدمة.
+TypeScript check ناجح.
+Build ناجح.
+المستودع نظيف ومتزامن مع origin/main.
+
+يوجد تحذير Build غير مانع متعلق بكبر بعض ملفات JavaScript الناتجة، ويمكن تحسينه مستقبلاً عبر code splitting وmanualChunks.
+يوجد تحذير pnpm عن نقل إعدادات pnpm من package.json إلى pnpm-workspace.yaml أو ملف إعداد حديث.
+
+6) أمر النشر على Termux
+------------------------
+cd ~/aurevion-project/aurevion-project && git pull origin main && npx vercel --prod --yes
+
+بعد النشر افحص الصحة:
+curl -sS https://aurevion-project.vercel.app/api/health
+
+يجب أن يظهر release قريباً من آخر Commit المنشور.
+
+7) اختبارات قبول بعد النشر
+---------------------------
+أرسل في المحادثة:
+صورة لقطة تنام في حديقة بيت تراثي عراقي
+المتوقع: صورة قطة، لا امرأة ولا شخص.
+
+أرسل أيضاً:
+صورة لمدينة مستقبلية بإضاءة سينمائية
+المتوقع: يتحول الطلب إلى Pollinations ويظهر داخل المحادثة.
+
+اختبر سؤالاً عادياً:
+ما هو أفضل تصميم لموقع؟
+المتوقع: يبقى رداً نصياً.
+
+اختبر بحثاً:
+ابحث عن صورة قطة
+المتوقع: لا يتحول تلقائياً إلى مولد الصور.
+
+اختبر الدفع فقط بعد ضبط Standard Web Key في PAYTABS_SERVER_KEY.
+لا تستخدم Mobile Authentication Key مع endpoint الدفع الويب.
+
+8) ما يحتاج متابعة مستقبلية
+----------------------------
+أولاً، يجب اختبار طلب إنشاء صورة فعلياً بعد نشر Commit 30c1e27، لأن Groq Prompt Enhancement يعمل فقط في بيئة Production وليس داخل الاختبارات.
+
+ثانياً، إذا كان المطلوب حفظ الصور بشكل دائم داخل قاعدة البيانات أو التخزين، يجب إضافة Object Storage وعدم الاكتفاء برابط Pollinations أو Data URL.
+
+ثالثاً، يجب إضافة اختبار REST كامل لـ /api/chat يتأكد من أن صورة النتيجة تعود في reply وimageUrl.
+
+رابعاً، يجب التحقق من أن إعدادات PayTabs في Vercel تستخدم Profile ID الخاص بنفس الحساب والمنطقة وبنفس Standard Web Key.
+
+خامساً، يمكن لاحقاً تحسين حجم bundle عبر تقسيم Mermaid وCytoscape وWASM إلى dynamic imports.
+
+9) قواعد مهمة للوكيل التالي
+----------------------------
+لا تحذف Environment Variables عشوائياً.
+لا تعرض أي قيمة سرية في السجلات أو الردود.
+لا تستخدم Mobile PayTabs Key لتكامل Web.
+لا تعيد توجيه كل سؤال يحتوي كلمة صورة إلى التوليد؛ احترم استثناءات البحث والتحليل والأسئلة.
+لا تعيد إضافة Developer إلى الواجهة.
+قبل أي تعديل، شغّل git status واقرأ الملف المتعلق فقط.
+بعد كل تعديل شغّل pnpm check وpnpm test وpnpm build.
+بعد نجاح الفحوصات استخدم git diff --check ثم commit وpush.
+النشر النهائي ينفذه المستخدم من Termux بالأمر الموجود في القسم 6.
+
+انتهت خريطة التسليم.
