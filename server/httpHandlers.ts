@@ -5,6 +5,7 @@ import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCa
 import { synthesizeVoice } from "./voice.js";
 import { transcribeAudio } from "./transcribe.js";
 import { createAurevionFeedback } from "./db.js";
+import { resolveServerImageIntent } from "./imageIntent.js";
 
 const requestWindows = new Map<string, { started: number; count: number }>();
 function allowRequest(req: VercelRequest, bucket: string, limit: number) {
@@ -35,7 +36,16 @@ export async function chat(req: VercelRequest, res: VercelResponse) {
   const sameOrigin = !origin || origin === `https://${host}` || origin === `http://${host}`;
   if (!sameOrigin && !isAuthorizedAurevionClient(key)) return res.status(401).json({ error: "عميل أوريفون غير مصرح." });
   const body = req.body || {}; if (typeof body.sessionId !== "string" || !Array.isArray(body.messages) || body.messages.length < 1) return res.status(400).json({ error: "بيانات المحادثة غير صالحة." });
-  try { return res.status(200).json(await chatWithAurevion(body)); } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : 502; return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." }); }
+  try {
+    const latest = body.messages[body.messages.length - 1];
+    const prompt = latest && typeof latest.content === "string" ? latest.content : "";
+    const imageMode = resolveServerImageIntent(prompt, typeof body.imageBase64 === "string");
+    if (imageMode) {
+      const result = await runImageStudio({ sessionId: body.sessionId, mode: imageMode, prompt, imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined, mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined, pro: Boolean(body.pro) });
+      return res.status(200).json({ ...result, reply: result.text, imageUrl: "imageDataUrl" in result ? result.imageDataUrl : undefined });
+    }
+    return res.status(200).json(await chatWithAurevion(body));
+  } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." }); }
 }
 export async function image(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const body = req.body || {};

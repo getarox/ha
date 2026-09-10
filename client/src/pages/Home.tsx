@@ -137,7 +137,7 @@ export default function Home() {
     }).then(async (response) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر إكمال الطلب الآن.");
-      setMessages((current) => [...current, { role: "assistant", content: data.reply, sources: Array.isArray(data.sources) ? data.sources : undefined }]);
+      setMessages((current) => [...current, { role: "assistant", content: data.reply, imageUrl: typeof data.imageUrl === "string" ? data.imageUrl : undefined, sources: Array.isArray(data.sources) ? data.sources : undefined }]);
       setFaceState("replying");
       window.setTimeout(() => setFaceState("idle"), 900);
     }).catch((error: any) => {
