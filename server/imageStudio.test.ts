@@ -33,6 +33,14 @@ describe("AUREVION image studio", () => {
     expect(getImageStudioModel("generate", true)).toBe("gemini-3-pro-image");
   });
 
+  it("clarifies Arabic cat prompts and excludes people", async () => {
+    const { runImageStudio } = await import("./imageStudio");
+    const result = await runImageStudio({ sessionId: `cat-${Date.now()}`, mode: "generate", prompt: "صورة لقطة تنام في حديقة بيت تراثي عراقي" });
+    const generatedUrl = decodeURIComponent(String(result.imageDataUrl));
+    expect(generatedUrl).toContain("قطة حقيقية نائمة");
+    expect(generatedUrl).toContain("بدون أي أشخاص");
+  });
+
   it("runs Groq Pro for a persisted Pro session without exposing the API key", async () => {
     process.env.DATABASE_URL = "mysql://test";
     const getAurevionSession = vi.fn(async () => ({ id: 7, sessionId: "persisted-pro-a", plan: "pro" as const, imagesUsed: 0 }));

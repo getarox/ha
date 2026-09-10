@@ -115,7 +115,10 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
 
 async function callPollinationsImage(input: ImageStudioInput) {
   const endpoint = "https://image.pollinations.ai/prompt";
-  const url = `${endpoint}/${encodeURIComponent(input.prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
+  const prompt = /لقطة|قطه/i.test(input.prompt)
+    ? `${input.prompt.replace(/لقطة|قطه/gi, "قطة")}، قطة حقيقية نائمة بوضوح، بدون أي أشخاص أو نساء أو وجوه بشرية`
+    : input.prompt;
+  const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
   return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: url };
 }
 
