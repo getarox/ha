@@ -5,6 +5,9 @@ describe("server image intent", () => {
   it.each(["سويلي صورة لمدينة مستقبلية", "اعمل لي رسمة تنين", "generate a cinematic image", "صمم شعار للمشروع"])("detects generation: %s", (prompt) => {
     expect(resolveServerImageIntent(prompt)).toBe("generate");
   });
+  it.each(["صورة لمدينة مستقبلية بإضاءة نيون", "أحتاج بوستر لفيلم خيال علمي", "show me a futuristic visual"])("detects natural image requests: %s", (prompt) => {
+    expect(resolveServerImageIntent(prompt)).toBe("generate");
+  });
   it("detects edit and analysis only with an image", () => {
     expect(resolveServerImageIntent("عدّل الصورة وخليها أوضح")).toBeNull();
     expect(resolveServerImageIntent("عدّل الصورة وخليها أوضح", true)).toBe("edit");
@@ -13,5 +16,6 @@ describe("server image intent", () => {
   it("does not turn ordinary questions into image requests", () => {
     expect(resolveServerImageIntent("ما هو أفضل تصميم لموقع؟")).toBeNull();
     expect(resolveServerImageIntent("ابحث عن صورة قطة")).toBeNull();
+    expect(resolveServerImageIntent("ما هي الصورة المناسبة للهوية؟")).toBeNull();
   });
 });
