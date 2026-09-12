@@ -6,7 +6,7 @@
 
 ### الإعداد الآمن
 
-يجب ضبط `GROQ_API_KEY` في Secrets الخاصة بالخادم فقط. لا ترفع `harth.txt` أو أي مفتاح إلى الموقع أو APK أو GitHub. عنوان الموقع الرسمي الافتراضي هو `https://aurevion-two.vercel.app`، ويمكن ضبط قائمة النطاقات المسموحة من خلال `AUREVION_ALLOWED_ORIGINS`.
+يجب ضبط `GROQ_API_KEY` في Secrets الخاصة بالخادم فقط. لا ترفع `harth.txt` أو أي مفتاح إلى الموقع أو APK أو GitHub. عنوان الإنتاج الرسمي هو `https://aurevion-project.vercel.app`، بينما `https://aurevion-two.vercel.app` موقع عرض فقط ولا يستقبل OAuth أو End Users أو callbacks أو بيانات إنتاج. يمكن ضبط قائمة النطاقات المسموحة من خلال `AUREVION_ALLOWED_ORIGINS`.
 
 ### واجهة Android
 

@@ -9,7 +9,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 object AurevionApi {
-    private const val BASE_URL = "https://aurevion-two.vercel.app"
+    private const val BASE_URL = "https://aurevion-project.vercel.app"
     private val client = OkHttpClient()
     private val sessionId = UUID.randomUUID().toString()
 

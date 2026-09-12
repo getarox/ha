@@ -200,7 +200,7 @@ export default function Home() {
           <a href="#brain" className="transition hover:text-cyan-300">العقل</a>
           <a href="#conversation" className="transition hover:text-cyan-300">المحادثة</a>
           <a href="#plans" className="transition hover:text-cyan-300">الخطط</a>
-          <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع الرسمي <ArrowUpRight className="h-3.5 w-3.5" /></a>
+          <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع التعريفي / Demo <ArrowUpRight className="h-3.5 w-3.5" /></a>
         </nav>
         <div className="flex items-center gap-2">
           <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
@@ -227,7 +227,7 @@ export default function Home() {
             <p className="mt-7 max-w-xl text-lg leading-8 text-slate-300">أوريفون عقل روبوتي مفتوح المصدر مبني على Groq، مصمم ليكون الرفيق الذكي لهاتف AUREVION الروبوتي؛ يفهم، يحلل، يبحث، ويستجيب لك بطريقة إنسانية.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#conversation"><Button size="lg" className="bg-cyan-300 px-6 text-slate-950 shadow-[0_0_32px_rgba(34,211,238,0.2)] hover:bg-cyan-200">جرّب العقل <ArrowUpRight className="mr-2 h-4 w-4" /></Button></a>
-              <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer"><Button size="lg" variant="outline" className="border-white/15 bg-white/[0.03] px-6 text-white hover:bg-white/10">زيارة الموقع الرسمي</Button></a>
+              <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer"><Button size="lg" variant="outline" className="border-white/15 bg-white/[0.03] px-6 text-white hover:bg-white/10">زيارة الموقع التعريفي</Button></a>
             </div>
             <div className="mt-12 grid max-w-xl grid-cols-3 gap-5 border-t border-white/10 pt-6">
               <div><div className="text-xl font-semibold text-cyan-200">24/7</div><div className="mt-1 text-xs text-slate-500">عقل متصل</div></div>
@@ -272,7 +272,7 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="flex flex-col justify-between gap-5 border-t border-white/10 py-8 text-xs text-slate-500 sm:flex-row sm:items-center"><div><span className="font-semibold tracking-[0.2em] text-slate-300">AUREVION</span><span className="mx-2 text-slate-700">/</span> أوريفون عقل روبوتي مفتوح المصدر مبني على Groq</div><div className="flex flex-wrap gap-5"><span>المطور: حارث عبدالله الجبوري</span><a className="text-cyan-300 hover:text-white" href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer">الموقع الرسمي ↗</a></div></footer>
+        <footer className="flex flex-col justify-between gap-5 border-t border-white/10 py-8 text-xs text-slate-500 sm:flex-row sm:items-center"><div><span className="font-semibold tracking-[0.2em] text-slate-300">AUREVION</span><span className="mx-2 text-slate-700">/</span> أوريفون عقل روبوتي مفتوح المصدر مبني على Groq</div><div className="flex flex-wrap gap-5"><span>المطور: حارث عبدالله الجبوري</span><a className="text-cyan-300 hover:text-white" href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer">الموقع التعريفي ↗</a></div></footer>
       </main>
     </div>
   );
