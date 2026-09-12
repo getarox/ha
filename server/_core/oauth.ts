@@ -40,6 +40,12 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      const provider = (userInfo.loginMethod ?? userInfo.platform ?? "").toLowerCase();
+      if (!["google", "microsoft", "apple"].includes(provider)) {
+        res.status(403).json({ error: "يجب تسجيل الدخول بحساب Google أو Microsoft أو Apple." });
+        return;
+      }
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,

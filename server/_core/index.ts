@@ -16,6 +16,8 @@ import {
   isAuthorizedAurevionClient,
 } from "../aurevion";
 import { agreement, acceptConsent, getConsent } from "../consent";
+import { authenticateRealOAuthRequest } from "../authGuard";
+import { requireConsent } from "../consent";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -153,6 +155,14 @@ export async function createApp() {
       return res
         .status(400)
         .json({ error: "بيانات المحادثة غير صالحة." });
+    }
+
+    try {
+      await authenticateRealOAuthRequest(req);
+      await requireConsent(parsed.data.sessionId);
+    } catch (error: any) {
+      const status = error?.code === "PRECONDITION_FAILED" ? 428 : 401;
+      return res.status(status).json({ error: error?.message || "يجب تسجيل الدخول والموافقة على الاتفاقية قبل تنفيذ أي أمر." });
     }
 
     try {
