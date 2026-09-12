@@ -80,3 +80,22 @@ curl -i -X POST "$BASE/api/chat" \
 ## 7. تشغيل آمن
 
 استخدم HTTPS أمام الخادم عند نشره على الإنترنت، واضبط `AUREVION_ALLOWED_ORIGINS` على النطاقات المطلوبة فقط. لا تفتح قاعدة البيانات مباشرة للإنترنت. راقب السجلات بحثاً عن أخطاء مزودي الذكاء الاصطناعي، ولا تطبع محتوى الأسرار أو قيمها.
+
+## 8. نشر التعديل على Vercel من Termux
+
+الموقع الإنتاجي الوحيد هو `https://aurevion-project.vercel.app`. أما `https://aurevion-two.vercel.app` فهو موقع عرض فقط ولا يُستخدم لـ OAuth أو End Users أو callbacks أو بيانات الإنتاج.
+
+بعد ضبط أسرار الإنتاج في مشروع Vercel، نفّذ الأمر التالي من داخل نسخة المستودع في Termux:
+
+```bash
+cd ~/ha && git pull --ff-only origin main && pnpm install --frozen-lockfile && pnpm check && pnpm test && pnpm build && npx vercel --prod --yes
+```
+
+ثم تحقّق من الإصدار الإنتاجي:
+
+```bash
+curl -sS https://aurevion-project.vercel.app/api/health
+curl -sS "https://aurevion-project.vercel.app/api/consent/status?sessionId=termux-acceptance-12345"
+```
+
+يجب ضبط `AUREVION_OFFICIAL_SITE_URL=https://aurevion-project.vercel.app` و`AUREVION_ALLOWED_ORIGINS=https://aurevion-project.vercel.app` في أسرار الإنتاج. لا تضع مفاتيح OAuth أو Groq أو PayTabs داخل التطبيق أو GitHub.

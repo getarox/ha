@@ -72,9 +72,22 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [voiceTone, setVoiceTone] = useState<"female" | "male" | "calm">("female");
+  const [consent, setConsent] = useState<{ accepted: boolean; agreement?: { title: string; intro: string; bullets: readonly string[]; accept: string; reject: string; required: string }; locale: "ar" | "en"; loading: boolean }>({ accepted: false, locale: typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("en") ? "en" : "ar", loading: true });
 
   const status = faceCopy[faceState];
   const messageCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
+  useEffect(() => {
+    void fetch(`/api/consent/status?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("consent status failed")))
+      .then((data) => setConsent((current) => ({ ...current, ...data, loading: false })))
+      .catch(() => setConsent((current) => ({ ...current, loading: false })));
+  }, [sessionId]);
+  const acceptAgreement = async () => {
+    const response = await fetch("/api/consent/accept", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, locale: consent.locale }) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "تعذر تسجيل الموافقة.");
+    setConsent((current) => ({ ...current, ...data, accepted: true, loading: false }));
+  };
   const submitFeedback = async () => {
     if (feedbackMessage.trim().length < 3 || feedbackSending) return;
     setFeedbackSending(true);
@@ -186,8 +199,9 @@ export default function Home() {
   };
 
   return (
-    <div className="aurevion-shell min-h-screen overflow-hidden text-white" dir="rtl">
+    <div className="aurevion-shell min-h-screen overflow-hidden text-white" dir={consent.locale === "en" ? "ltr" : "rtl"}>
       <div className="aurevion-noise" />
+      {!consent.loading && !consent.accepted && consent.agreement && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-4" role="dialog" aria-modal="true"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-cyan-300/25 bg-slate-950 p-6 text-slate-100 shadow-2xl sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">AUREVION / REQUIRED CONSENT</p><h1 className="mt-2 text-2xl font-semibold text-white">{consent.agreement.title}</h1></div><select aria-label="لغة الاتفاقية" value={consent.locale} onChange={(event) => setConsent((current) => ({ ...current, locale: event.target.value as "ar" | "en" }))} className="rounded-lg border border-white/10 bg-white/10 p-2 text-sm"><option value="ar">العربية</option><option value="en">English</option></select></div><p className="mt-5 text-sm leading-7 text-slate-300">{consent.agreement.intro}</p><ul className="mt-5 list-disc space-y-3 ps-5 text-sm leading-7 text-slate-300">{consent.agreement.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul><p className="mt-6 rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-amber-100">{consent.agreement.required}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button type="button" onClick={() => void acceptAgreement().catch((error) => window.alert(error.message))} className="bg-cyan-300 text-slate-950 hover:bg-cyan-200">{consent.agreement.accept}</Button><Button type="button" variant="outline" onClick={() => window.location.href = "about:blank"} className="border-white/15">{consent.agreement.reject}</Button></div><p className="mt-4 text-[11px] text-slate-500">Consent version: 2026-09-13.v1</p></div></div>}
       <header className="aurevion-header relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 lg:px-8">
         <Link href="/" className="flex items-center gap-3" aria-label="العودة إلى بوابة أوريفون">
           <span className="brand-mark"><Bot className="h-5 w-5" /></span>

@@ -23,6 +23,9 @@ export type InsertUser = typeof users.$inferInsert;
 export const aurevionSessions = mysqlTable("aurevion_sessions", {
   id: int("id").autoincrement().primaryKey(),
   sessionKey: varchar("sessionKey", { length: 128 }).notNull().unique(),
+  consentVersion: varchar("consentVersion", { length: 64 }),
+  consentLocale: varchar("consentLocale", { length: 8 }),
+  consentAcceptedAt: timestamp("consentAcceptedAt"),
   plan: mysqlEnum("plan", ["free", "pro"]).default("free").notNull(),
   messagesUsed: int("messagesUsed").default(0).notNull(),
   imagesUsed: int("imagesUsed").default(0).notNull(),

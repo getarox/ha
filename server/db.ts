@@ -10,7 +10,10 @@ let _schemaReady: Promise<void> | null = null;
 async function ensureOperationalSchema(pool: mysql.Pool) {
   const statements = [
     "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
-    "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
+    "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `consentVersion` varchar(64), `consentLocale` varchar(8), `consentAcceptedAt` timestamp NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
+    "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `consentVersion` varchar(64) NULL",
+    "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `consentLocale` varchar(8) NULL",
+    "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `consentAcceptedAt` timestamp NULL",
     "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `imagesUsed` int NOT NULL DEFAULT 0",
     "CREATE TABLE IF NOT EXISTS `wallets` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `balance` decimal(12,2) NOT NULL DEFAULT 0.00, `currency` varchar(3) NOT NULL DEFAULT 'SAR', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `wallets_id` PRIMARY KEY(`id`), CONSTRAINT `wallets_sessionKey_unique` UNIQUE(`sessionKey`))",
     "CREATE TABLE IF NOT EXISTS `wallet_ledger` (`id` int AUTO_INCREMENT NOT NULL, `walletId` int NOT NULL, `reference` varchar(128) NOT NULL, `type` enum('credit','debit','refund','hold','release') NOT NULL, `amount` decimal(12,2) NOT NULL, `description` varchar(255), `createdAt` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `wallet_ledger_id` PRIMARY KEY(`id`), CONSTRAINT `wallet_ledger_reference_unique` UNIQUE(`reference`))",
@@ -148,6 +151,29 @@ export async function updateAurevionSession(
   const db = await getDb();
   if (!db) return;
   await db.update(aurevionSessions).set(values).where(eq(aurevionSessions.id, id));
+}
+
+export async function getAurevionConsent(sessionKey: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({
+    consentVersion: aurevionSessions.consentVersion,
+    consentLocale: aurevionSessions.consentLocale,
+    consentAcceptedAt: aurevionSessions.consentAcceptedAt,
+  }).from(aurevionSessions).where(eq(aurevionSessions.sessionKey, sessionKey)).limit(1);
+  return result[0];
+}
+
+export async function saveAurevionConsent(sessionKey: string, values: { version: string; locale: "ar" | "en"; acceptedAt: string }) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getAurevionSession(sessionKey);
+  const consent = { consentVersion: values.version, consentLocale: values.locale, consentAcceptedAt: new Date(values.acceptedAt) };
+  if (existing) {
+    await db.update(aurevionSessions).set(consent).where(eq(aurevionSessions.sessionKey, sessionKey));
+  } else {
+    await db.insert(aurevionSessions).values({ sessionKey, contextJson: "[]", ...consent });
+  }
 }
 
 export async function setAurevionSessionPlan(sessionKey: string, plan: "free" | "pro"): Promise<void> {

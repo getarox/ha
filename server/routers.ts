@@ -6,36 +6,34 @@ import { chatWithAurevion, getAurevionHealth, getAurevionSessionStats, isAllowed
 import { runImageStudio } from "./imageStudio";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
+import { agreement, acceptConsent, getConsent, requireConsent } from "./consent";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
-
   aurevion: router({
+    consent: router({
+      agreement: publicProcedure.query(() => ({ version: "2026-09-13.v1", agreement })),
+      status: publicProcedure.input(z.object({ sessionId: z.string().min(8).max(128) })).query(({ input }) => getConsent(input.sessionId)),
+      accept: publicProcedure.input(z.object({ sessionId: z.string().min(8).max(128), locale: z.enum(["ar", "en"]).default("ar") })).mutation(({ input }) => acceptConsent(input.sessionId, input.locale)),
+    }),
     chat: publicProcedure
       .input(z.object({
         sessionId: z.string().min(8).max(128),
-        messages: z.array(z.object({
-          role: z.enum(["user", "assistant"]),
-          content: z.string().min(1).max(8000),
-        })).min(1).max(12),
+        messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) })).min(1).max(12),
         webSearch: z.boolean().default(false),
       }))
       .mutation(async ({ input, ctx }) => {
+        await requireConsent(input.sessionId);
         const origin = ctx.req.headers.origin;
-        if (typeof origin === "string" && !isAllowedAurevionOrigin(origin)) {
-          throw new Error("هذا النطاق غير مصرح له باستخدام بوابة أوريفون.");
-        }
+        if (typeof origin === "string" && !isAllowedAurevionOrigin(origin)) throw new Error("هذا النطاق غير مصرح له باستخدام بوابة أوريفون.");
         return chatWithAurevion(input);
       }),
     imageStudio: publicProcedure
@@ -48,29 +46,20 @@ export const appRouter = router({
         pro: z.boolean().default(false),
       }))
       .mutation(async ({ input, ctx }) => {
+        await requireConsent(input.sessionId);
         const origin = ctx.req.headers.origin;
-        if (typeof origin === "string" && !isAllowedAurevionOrigin(origin)) {
-          throw new Error("هذا النطاق غير مصرح له باستخدام استوديو أوريفون.");
-        }
+        if (typeof origin === "string" && !isAllowedAurevionOrigin(origin)) throw new Error("هذا النطاق غير مصرح له باستخدام استوديو أوريفون.");
         return runImageStudio(input);
       }),
     ownerHealth: adminProcedure.query(async () => getAurevionHealth()),
-    ownerSetPlan: adminProcedure
-      .input(z.object({ sessionId: z.string().min(8).max(128), plan: z.enum(["free", "pro"]) }))
-      .mutation(({ input }) => setAurevionPlan(input.sessionId, input.plan)),
-    ownerStats: adminProcedure.query(async () => {
-      const stats = await getAurevionSessionStats();
-      return {
-        identity: "أوريفون — عقل روبوتي مفتوح المصدر مبني على Groq لهاتف AUREVION",
-        officialSiteUrl: ENV.officialSiteUrl,
-        model: ENV.groqModel,
-        plans: [
-          { id: "free", name: "مجانية", messages: ENV.freeMessageLimit },
-          { id: "pro", name: "احترافية", messages: ENV.proMessageLimit },
-        ],
-        stats,
-      };
-    }),
+    ownerSetPlan: adminProcedure.input(z.object({ sessionId: z.string().min(8).max(128), plan: z.enum(["free", "pro"]) })).mutation(({ input }) => setAurevionPlan(input.sessionId, input.plan)),
+    ownerStats: adminProcedure.query(async () => ({
+      identity: "أوريفون — عقل روبوتي مفتوح المصدر مبني على Groq لهاتف AUREVION",
+      officialSiteUrl: ENV.officialSiteUrl,
+      model: ENV.groqModel,
+      plans: [{ id: "free", name: "مجانية", messages: ENV.freeMessageLimit }, { id: "pro", name: "احترافية", messages: ENV.proMessageLimit }],
+      stats: await getAurevionSessionStats(),
+    })),
   }),
 });
 

@@ -15,6 +15,7 @@ import {
   isAllowedAurevionOrigin,
   isAuthorizedAurevionClient,
 } from "../aurevion";
+import { agreement, acceptConsent, getConsent } from "../consent";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,6 +45,17 @@ export async function createApp() {
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  app.get("/api/consent/status", async (req, res) => {
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
+    if (sessionId.length < 8) return res.status(400).json({ error: "sessionId غير صالح." });
+    return res.json({ agreement, ...(await getConsent(sessionId)) });
+  });
+  app.post("/api/consent/accept", async (req, res) => {
+    const { sessionId, locale } = req.body ?? {};
+    if (typeof sessionId !== "string" || sessionId.length < 8 || (locale !== "ar" && locale !== "en")) return res.status(400).json({ error: "بيانات الموافقة غير صالحة." });
+    return res.json(await acceptConsent(sessionId, locale));
+  });
 
   const chatBodySchema = z.object({
     sessionId: z.string().min(8).max(128),

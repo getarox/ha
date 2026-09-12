@@ -11,6 +11,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (path === "/api/voice") return handlers.voice(req, res);
   if (path === "/api/transcribe") return handlers.transcribe(req, res);
   if (path === "/api/feedback") return handlers.feedback(req, res);
+  if (path === "/api/consent/status") return handlers.consentStatus(req, res);
+  if (path === "/api/consent/accept") return handlers.consentAccept(req, res);
   if (path === "/api/chat") return handlers.chat(req, res);
   if (path === "/api/image") return handlers.image(req, res);
   if (path === "/api/wallet") return handlers.wallet(req, res);
