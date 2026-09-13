@@ -101,3 +101,15 @@ curl -sS "https://aurevion-project.vercel.app/api/consent/status?sessionId=termu
 ```
 
 يجب ضبط `AUREVION_OFFICIAL_SITE_URL=https://aurevion-project.vercel.app` و`AUREVION_ALLOWED_ORIGINS=https://aurevion-project.vercel.app` في أسرار الإنتاج. لا تضع مفاتيح OAuth أو Groq أو PayTabs داخل التطبيق أو GitHub.
+
+يجب كذلك ضبط متغيرات OAuth التالية في مشروع Vercel قبل البناء، لأنها تدخل في JavaScript الواجهة وقت `vercel build`:
+
+```bash
+vercel login
+vercel link
+vercel env add VITE_APP_ID production
+vercel env add VITE_OAUTH_PORTAL_URL production
+vercel env add OAUTH_SERVER_URL production
+```
+
+بعد إدخال القيم الصحيحة أعد النشر. إذا ظهر `expired_token` نفّذ `vercel logout` ثم `vercel login` مجددًا. لا تستخدم قيمًا تخمينية؛ خذ القيم من إعدادات مشروع OAuth في Manus.

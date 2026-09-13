@@ -17,6 +17,11 @@ export const startLogin = () => {
   const appId = import.meta.env.VITE_APP_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
 
+  if (typeof oauthPortalUrl !== "string" || !oauthPortalUrl.trim() || typeof appId !== "string" || !appId.trim()) {
+    window.alert("تسجيل الدخول غير مُهيأ في نسخة الإنتاج. يجب ضبط VITE_OAUTH_PORTAL_URL و VITE_APP_ID في Vercel ثم إعادة النشر.");
+    return;
+  }
+
   const nonce = crypto.randomUUID();
   document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600; SameSite=None; Secure`;
   const state = encodeOAuthState({ redirectUri, nonce });
