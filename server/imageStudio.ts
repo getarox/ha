@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { randomUUID } from "node:crypto";
-import { ENV } from "./_core/env";
-import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db";
-import { chargeUsage } from "./billing";
+import { ENV } from "./_core/env.js";
+import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db.js";
+import { chargeUsage } from "./billing.js";
 
 export type ImageStudioMode = "generate" | "edit" | "analyze" | "evaluate";
 

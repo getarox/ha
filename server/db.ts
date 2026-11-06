@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2";
-import { AurevionSession, InsertAurevionFeedback, InsertUser, aurevionFeedback, aurevionSessions, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { AurevionSession, InsertAurevionFeedback, InsertUser, aurevionFeedback, aurevionSessions, users } from "../drizzle/schema.js";
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _schemaReady: Promise<void> | null = null;

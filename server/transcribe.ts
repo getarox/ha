@@ -1,4 +1,4 @@
-import { ENV } from "./_core/env";
+import { ENV } from "./_core/env.js";
 
 export async function transcribeAudio(audioBase64: string, mimeType = "audio/webm") {
   if (!ENV.groqApiKey) throw new Error("خادم Groq غير مهيأ بعد.");

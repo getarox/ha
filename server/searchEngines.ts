@@ -1,4 +1,4 @@
-import { ENV } from "./_core/env";
+import { ENV } from "./_core/env.js";
 
 export type SearchResult = { title: string; url: string; snippet: string; source: string };
 async function get(url: string, init?: RequestInit) { const r = await fetch(url, { ...init, signal: AbortSignal.timeout(3500) }); if (!r.ok) throw new Error(`search ${r.status}`); return r.json(); }
