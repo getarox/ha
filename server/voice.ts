@@ -1,4 +1,4 @@
-import { ENV } from "./_core/env.js";
+import { ENV } from "./_core/env";
 
 export const VOICE_PRESETS = {
   female: { label: "أنثى عربية", voiceId: process.env.ELEVENLABS_VOICE_FEMALE ?? "EXAVITQu4vr4xnSDxMaL" },

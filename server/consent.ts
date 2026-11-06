@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import * as db from "./db.js";
+import * as db from "./db";
 
 export const CONSENT_VERSION = "2026-09-13.v1";
 export type ConsentLocale = "ar" | "en";

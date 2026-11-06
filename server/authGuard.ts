@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import type { Request } from "express";
-import type { User } from "../drizzle/schema.js";
-import { sdk } from "./_core/sdk.js";
+import type { User } from "../drizzle/schema";
+import { sdk } from "./_core/sdk";
 
 const REAL_OAUTH_PROVIDERS = new Set(["google", "microsoft", "apple"]);
 

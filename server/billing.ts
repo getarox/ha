@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { aiUsage, payments, pricing, walletLedger, wallets } from "../drizzle/schema.js";
-import { ENV } from "./_core/env.js";
-import { getDb } from "./db.js";
+import { aiUsage, payments, pricing, walletLedger, wallets } from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { getDb } from "./db";
 
 const memoryWallets = new Map<string, number>();
 const DEFAULT_PRICES: Record<string, string> = { chat: ENV.chatPrice, image: ENV.imagePrice };

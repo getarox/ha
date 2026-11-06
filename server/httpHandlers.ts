@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { chatWithAurevion, isAllowedAurevionOrigin, isAuthorizedAurevionClient } from "./aurevion.js";
-import { runImageStudio } from "./imageStudio.js";
-import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCallback } from "./billing.js";
-import { synthesizeVoice } from "./voice.js";
-import { transcribeAudio } from "./transcribe.js";
-import { createAurevionFeedback } from "./db.js";
-import { resolveServerImageIntent } from "./imageIntent.js";
-import { agreement, acceptConsent, getConsent, requireConsent } from "./consent.js";
-import { authenticateRealOAuthRequest } from "./authGuard.js";
+import { chatWithAurevion, isAllowedAurevionOrigin, isAuthorizedAurevionClient } from "./aurevion";
+import { runImageStudio } from "./imageStudio";
+import { createPayTabsPayment, getWallet, settlePayTabsCallback, verifyPayTabsCallback } from "./billing";
+import { synthesizeVoice } from "./voice";
+import { transcribeAudio } from "./transcribe";
+import { createAurevionFeedback } from "./db";
+import { resolveServerImageIntent } from "./imageIntent";
+import { agreement, acceptConsent, getConsent, requireConsent } from "./consent";
+import { authenticateRealOAuthRequest } from "./authGuard";
 
 const requestWindows = new Map<string, { started: number; count: number }>();
 function allowRequest(req: VercelRequest, bucket: string, limit: number) {

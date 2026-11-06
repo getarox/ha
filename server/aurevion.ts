@@ -1,15 +1,15 @@
 import { timingSafeEqual } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./_core/env.js";
+import { ENV } from "./_core/env";
 import {
   createAurevionSession,
   getAurevionSession,
   getAurevionSessionStats,
   setAurevionSessionPlan,
   updateAurevionSession,
-} from "./db.js";
-import { getLiveContext } from "./liveTools.js";
-import { formatSearchContext, searchWeb, type SearchResult } from "./searchEngines.js";
+} from "./db";
+import { getLiveContext } from "./liveTools";
+import { formatSearchContext, searchWeb, type SearchResult } from "./searchEngines";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type StoredContext = ChatMessage[];
