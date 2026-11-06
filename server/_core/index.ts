@@ -5,18 +5,18 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { registerOAuthRoutes } from "./oauth";
-import { registerStorageProxy } from "./storageProxy";
-import { appRouter } from "../routers";
-import { createContext } from "./context";
+import { registerOAuthRoutes } from "./oauth.js";
+import { registerStorageProxy } from "./storageProxy.js";
+import { appRouter } from "../routers.js";
+import { createContext } from "./context.js";
 import {
   chatWithAurevion,
   isAllowedAurevionOrigin,
   isAuthorizedAurevionClient,
-} from "../aurevion";
-import { agreement, acceptConsent, getConsent } from "../consent";
-import { authenticateRealOAuthRequest } from "../authGuard";
-import { requireConsent } from "../consent";
+} from "../aurevion.js";
+import { agreement, acceptConsent, getConsent } from "../consent.js";
+import { authenticateRealOAuthRequest } from "../authGuard.js";
+import { requireConsent } from "../consent.js";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -206,10 +206,10 @@ async function startServer() {
   const server = createServer(app);
 
   if (process.env.NODE_ENV === "development") {
-    const { setupVite } = await import("./vite");
+    const { setupVite } = await import("./vite.js");
     await setupVite(app, server);
   } else {
-    const { serveStatic } = await import("./vite");
+    const { serveStatic } = await import("./vite.js");
     serveStatic(app);
   }
 

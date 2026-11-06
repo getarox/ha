@@ -1,13 +1,13 @@
 import { COOKIE_NAME } from "../shared/const.js";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
+import { getSessionCookieOptions } from "./_core/cookies.js";
+import { systemRouter } from "./_core/systemRouter.js";
 import { z } from "zod";
-import { chatWithAurevion, getAurevionHealth, getAurevionSessionStats, isAllowedAurevionOrigin, setAurevionPlan } from "./aurevion";
-import { runImageStudio } from "./imageStudio";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
-import { ENV } from "./_core/env";
-import { agreement, acceptConsent, getConsent, requireConsent } from "./consent";
-import { requireRealOAuthUser } from "./authGuard";
+import { chatWithAurevion, getAurevionHealth, getAurevionSessionStats, isAllowedAurevionOrigin, setAurevionPlan } from "./aurevion.js";
+import { runImageStudio } from "./imageStudio.js";
+import { adminProcedure, publicProcedure, router } from "./_core/trpc.js";
+import { ENV } from "./_core/env.js";
+import { agreement, acceptConsent, getConsent, requireConsent } from "./consent.js";
+import { requireRealOAuthUser } from "./authGuard.js";
 
 export const appRouter = router({
   system: systemRouter,
