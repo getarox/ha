@@ -41,8 +41,8 @@ export function registerOAuthRoutes(app: Express) {
       }
 
       const provider = (userInfo.loginMethod ?? userInfo.platform ?? "").toLowerCase();
-      if (!["google", "microsoft", "apple"].includes(provider)) {
-        res.status(403).json({ error: "يجب تسجيل الدخول بحساب Google أو Microsoft أو Apple." });
+      if (!["google", "email", "phone"].includes(provider)) {
+        res.status(403).json({ error: "يجب تسجيل الدخول عبر Google أو البريد الإلكتروني أو رقم الهاتف." });
         return;
       }
 

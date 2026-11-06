@@ -19,7 +19,7 @@ function allowRequest(req: VercelRequest, bucket: string, limit: number) {
   current.count += 1; return true;
 }
 function rateLimited(req: VercelRequest, res: VercelResponse, bucket: string, limit: number) { if (allowRequest(req, bucket, limit)) return false; res.setHeader("Retry-After", "60"); res.status(429).json({ error: "طلبات كثيرة جدًا. حاول بعد دقيقة." }); return true; }
-async function requireOAuth(req: VercelRequest, res: VercelResponse) { try { await authenticateRealOAuthRequest(req as any); return true; } catch (error: any) { res.status(401).json({ error: error?.message || "يجب تسجيل الدخول عبر Google أو Microsoft أو Apple." }); return false; } }
+async function requireOAuth(req: VercelRequest, res: VercelResponse) { try { await authenticateRealOAuthRequest(req as any); return true; } catch (error: any) { res.status(401).json({ error: error?.message || "يجب تسجيل الدخول عبر Google أو البريد الإلكتروني أو رقم الهاتف." }); return false; } }
 
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 export async function consentStatus(req: VercelRequest, res: VercelResponse) { const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : ""; if (sessionId.length < 8) return res.status(400).json({ error: "sessionId غير صالح." }); return res.status(200).json({ agreement, ...(await getConsent(sessionId)) }); }

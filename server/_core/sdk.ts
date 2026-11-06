@@ -101,6 +101,12 @@ class SDKServer {
     );
     if (set.has("REGISTERED_PLATFORM_EMAIL")) return "email";
     if (set.has("REGISTERED_PLATFORM_GOOGLE")) return "google";
+    if (
+      set.has("REGISTERED_PLATFORM_PHONE") ||
+      set.has("REGISTERED_PLATFORM_SMS") ||
+      set.has("REGISTERED_PLATFORM_MOBILE")
+    )
+      return "phone";
     if (set.has("REGISTERED_PLATFORM_APPLE")) return "apple";
     if (
       set.has("REGISTERED_PLATFORM_MICROSOFT") ||
