@@ -1,6 +1,7 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Start the direct Google OAuth flow from a user action.
 export const startLogin = () => {
-  window.location.href = "/api/auth/google/start";
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const returnPath = currentPath.startsWith("/login") ? "/" : currentPath;
+  window.location.assign(`/login?next=${encodeURIComponent(returnPath)}`);
 };

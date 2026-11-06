@@ -18,6 +18,7 @@ import { agreement, acceptConsent, getConsent } from "../consent.js";
 import { authenticateRealOAuthRequest } from "../authGuard.js";
 import { requireConsent } from "../consent.js";
 import { registerGoogleOAuthRoutes } from "../googleOAuth.js";
+import { registerFirebaseAuthRoutes } from "../firebaseAuth.js";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -48,6 +49,7 @@ export async function createApp() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerGoogleOAuthRoutes(app);
+  registerFirebaseAuthRoutes(app);
 
   app.get("/api/consent/status", async (req, res) => {
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
