@@ -219,6 +219,7 @@ export default function Home() {
           <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع التعريفي / Demo <ArrowUpRight className="h-3.5 w-3.5" /></a>
         </nav>
         <div className="flex items-center gap-2">
+          {!user ? <Button type="button" onClick={startLogin} className="bg-cyan-300 text-slate-950 hover:bg-cyan-200">تسجيل الدخول</Button> : null}
           <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
           {user?.role === "admin" ? <Link href="/owner" className="hidden sm:block"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">لوحة المالك</Button></Link> : null}
           <Button variant="ghost" size="icon" className="text-slate-300" aria-label="فتح قائمة الإعدادات" aria-controls="aurevion-settings-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Menu className="h-5 w-5" /></Button>
