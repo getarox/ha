@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ ok: true, service: "aurevion-vercel-api", release: process.env.VERCEL_GIT_COMMIT_SHA ?? "local", cloud_fallback: "groq" });
   }
-  const handlers = await import("../server/httpHandlers.js");
+  const handlers = await import("../server/httpHandlers");
   if (path === "/api/voice") return handlers.voice(req, res);
   if (path === "/api/transcribe") return handlers.transcribe(req, res);
   if (path === "/api/feedback") return handlers.feedback(req, res);
@@ -19,6 +19,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (path === "/api/payments/create") return handlers.paymentCreate(req, res);
   if (path === "/api/payments/callback") return handlers.paymentCallback(req, res);
   if (path === "/api/payments/return") return handlers.paymentReturn(req, res);
-  appPromise ??= import("../server/_core/index.js").then(({ createApp }) => createApp());
+  appPromise ??= import("../server/_core/index").then(({ createApp }) => createApp());
   return (await appPromise)(req, res);
 }
