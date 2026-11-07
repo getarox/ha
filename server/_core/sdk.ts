@@ -171,15 +171,15 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; appId?: string } = {},
   ): Promise<string> {
     return this.signSession(
       {
         openId,
-        appId: ENV.appId,
+        appId: options.appId ?? ENV.appId,
         name: options.name || "",
       },
-      options
+      { expiresInMs: options.expiresInMs }
     );
   }
 

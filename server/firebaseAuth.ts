@@ -125,7 +125,10 @@ export function registerFirebaseAuthRoutes(app: Express) {
         return res.status(503).json({ error: "خدمة الحسابات غير متاحة حاليًا. حاول لاحقًا." });
       }
 
-      const sessionToken = await sdk.createSessionToken(identity.openId, { name: identity.name });
+      const sessionToken = await sdk.createSessionToken(identity.openId, {
+        name: identity.name,
+        appId: FIREBASE_PROJECT_ID,
+      });
       res.cookie(COOKIE_NAME, sessionToken, {
         ...getSessionCookieOptions(req),
         maxAge: ONE_YEAR_MS,
