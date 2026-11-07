@@ -23,6 +23,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { isImageGenerationRequest } from "@/lib/intent";
+import { getAurevionSessionId } from "@/lib/session";
 
 type FaceState = "idle" | "listening" | "thinking" | "replying";
 
@@ -32,16 +33,6 @@ const faceCopy: Record<FaceState, { label: string; detail: string }> = {
   thinking: { label: "يفكر", detail: "أحلل السؤال وأبني الرد" },
   replying: { label: "يرد", detail: "أوريفون يتحدث معك" },
 };
-
-function getSessionId() {
-  if (typeof window === "undefined") return "aurevion-preview-session";
-  const storageKey = "aurevion-session-id";
-  const current = window.localStorage.getItem(storageKey);
-  if (current) return current;
-  const next = crypto.randomUUID();
-  window.localStorage.setItem(storageKey, next);
-  return next;
-}
 
 function RobotFace({ state }: { state: FaceState }) {
   return (
@@ -60,7 +51,7 @@ export default function Home() {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [faceState, setFaceState] = useState<FaceState>("idle");
-  const [sessionId] = useState(getSessionId);
+  const [sessionId] = useState(getAurevionSessionId);
   const [chatPending, setChatPending] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [paymentPending, setPaymentPending] = useState<number | null>(null);
@@ -80,7 +71,11 @@ export default function Home() {
   useEffect(() => {
     void fetch(`/api/consent/status?sessionId=${encodeURIComponent(sessionId)}`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("consent status failed")))
-      .then((data) => setConsent((current) => ({ ...current, ...data, loading: false })))
+      .then((data) => setConsent((current) => {
+        const locale = data.locale === "en" || data.locale === "ar" ? data.locale : current.locale;
+        const agreement = data.agreement?.[locale] ?? data.agreement;
+        return { ...current, ...data, locale, agreement, loading: false };
+      }))
       .catch(() => setConsent((current) => ({ ...current, loading: false })));
   }, [sessionId]);
   const acceptAgreement = async () => {

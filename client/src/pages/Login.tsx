@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { firebaseAuth, googleProvider } from "@/lib/firebase";
+import { getAurevionSessionId, getConsentLocale } from "@/lib/session";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -15,6 +16,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 
 type AuthMode = "signin" | "signup";
+type AgreementCopy = { title: string; intro: string; bullets: readonly string[]; required: string };
 
 function safeReturnPath() {
   const next = new URLSearchParams(window.location.search).get("next");
@@ -49,7 +51,7 @@ function firebaseErrorMessage(error: unknown) {
   return messages[code] ?? "تعذر تسجيل الدخول الآن. تحقق من إعداد Firebase وحاول مجددًا.";
 }
 
-async function createServerSession(user: User) {
+async function createServerSession(user: User, sessionId: string, locale: "ar" | "en") {
   const idToken = await user.getIdToken();
   const response = await fetch("/api/auth/firebase/session", {
     method: "POST",
@@ -61,6 +63,18 @@ async function createServerSession(user: User) {
   if (!response.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "تعذر إنشاء جلسة أوريفون.");
   }
+
+  const consentResponse = await fetch("/api/consent/accept", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, locale }),
+  });
+  const consentData = await consentResponse.json().catch(() => ({}));
+  if (!consentResponse.ok) {
+    throw new Error(typeof consentData.error === "string" ? consentData.error : "تعذر حفظ موافقتك على الاتفاقية.");
+  }
+
   window.location.replace(safeReturnPath());
 }
 
@@ -71,10 +85,25 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [sessionId] = useState(getAurevionSessionId);
+  const [locale] = useState(getConsentLocale);
+  const [agreement, setAgreement] = useState<AgreementCopy | null>(null);
 
   useEffect(() => {
     document.title = "تسجيل الدخول | AUREVION";
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/consent/status?sessionId=${encodeURIComponent(sessionId)}`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("agreement unavailable")))
+      .then((data) => {
+        const copy = data.agreement?.[locale] ?? data.agreement;
+        if (active && copy && typeof copy.title === "string") setAgreement(copy);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [locale, sessionId]);
 
   const run = async (operation: () => Promise<void>) => {
     setBusy(true);
@@ -92,7 +121,7 @@ export default function Login() {
 
   const signInWithGoogle = () => run(async () => {
     const credential = await signInWithPopup(firebaseAuth, googleProvider);
-    await createServerSession(credential.user);
+    await createServerSession(credential.user, sessionId, locale);
   });
 
   const submitEmail = (event: FormEvent<HTMLFormElement>) => {
@@ -116,7 +145,7 @@ export default function Login() {
         setError("تحقق من بريدك الإلكتروني أولًا. أرسلنا إليك رسالة تحقق جديدة.");
         return;
       }
-      await createServerSession(credential.user);
+      await createServerSession(credential.user, sessionId, locale);
     });
   };
 
@@ -167,6 +196,33 @@ export default function Login() {
               <p className="text-xs tracking-[0.2em] text-cyan-200/60">AUREVION / ACCOUNT</p>
               <h2 className="mt-3 text-2xl font-semibold text-white">{mode === "signin" ? "تسجيل الدخول" : "إنشاء حساب"}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">{mode === "signin" ? "اختر طريقة الدخول المناسبة لك." : "أنشئ حسابًا جديدًا للبدء مع أوريفون."}</p>
+            </div>
+
+            <div className="mb-4 rounded-xl border border-cyan-200/15 bg-cyan-300/[0.04] p-3 text-xs leading-6 text-slate-300">
+              <p className="font-medium text-cyan-100">{agreement?.title ?? (locale === "en" ? "License and Safe Use Agreement" : "اتفاقية الترخيص والاستخدام الآمن")}</p>
+              <p className="mt-1">
+                {locale === "en"
+                  ? "By signing in or creating an account, you agree to this agreement. Your consent is recorded after sign-in succeeds; no separate acceptance step follows."
+                  : "بالضغط على تسجيل الدخول أو إنشاء الحساب، توافق على هذه الاتفاقية. تُسجّل موافقتك بعد نجاح الدخول، ولن تظهر خطوة قبول منفصلة بعد ذلك."}
+              </p>
+              <details className="mt-2">
+                <summary className="cursor-pointer select-none font-medium text-cyan-200 hover:text-white">
+                  {locale === "en" ? "Read the full agreement" : "قراءة الاتفاقية كاملة"}
+                </summary>
+                <div className="mt-3 max-h-52 space-y-3 overflow-y-auto pe-1 text-slate-300">
+                  {agreement ? (
+                    <>
+                      <p>{agreement.intro}</p>
+                      <ul className="list-disc space-y-2 ps-5">
+                        {agreement.bullets.map((bullet, index) => <li key={`${index}-${bullet}`}>{bullet}</li>)}
+                      </ul>
+                      <p className="text-amber-100">{agreement.required}</p>
+                    </>
+                  ) : (
+                    <p>{locale === "en" ? "Loading agreement text…" : "جارٍ تحميل نص الاتفاقية…"}</p>
+                  )}
+                </div>
+              </details>
             </div>
 
             <Button type="button" onClick={() => void signInWithGoogle()} disabled={busy} className="h-12 w-full border border-white/15 bg-white text-slate-900 hover:bg-slate-100">

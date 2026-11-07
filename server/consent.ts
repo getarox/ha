@@ -10,7 +10,7 @@ const memoryConsent = new Map<string, ConsentRecord>();
 export const agreement = {
   ar: {
     title: "اتفاقية الترخيص والاستخدام الآمن",
-    intro: "قبل استخدام AUREVION، اقرأ البنود التالية ووافق عليها. لا تُنفّذ أي أوامر أو طلبات قبل تسجيل موافقتك.",
+    intro: "بالضغط على زر تسجيل الدخول، توافق على البنود التالية قبل استخدام AUREVION. النص الكامل متاح للقراءة قبل المتابعة.",
     bullets: [
       "تستخدم الخدمة للمساعدة المشروعة فقط، وتتحمل مسؤولية المحتوى والطلبات والنتائج التي تنشئها.",
       "لا تستخدمها لإيذاء الأشخاص، أو الاحتيال، أو اختراق الأنظمة، أو انتهاك الخصوصية، أو مخالفة القوانين أو حقوق الغير.",
@@ -20,11 +20,11 @@ export const agreement = {
     ],
     accept: "أوافق وأتابع",
     reject: "لا أوافق",
-    required: "الموافقة مطلوبة قبل تنفيذ أي أمر.",
+    required: "تُسجّل موافقتك بعد نجاح تسجيل الدخول، ولا تُنفّذ الأوامر قبل ذلك.",
   },
   en: {
     title: "License and Safe Use Agreement",
-    intro: "Before using AUREVION, read these terms and accept them. No command or request is executed until your consent is recorded.",
+    intro: "By selecting a sign-in option, you agree to the following terms before using AUREVION. The full agreement is available to review before continuing.",
     bullets: [
       "Use the service only for lawful and legitimate assistance. You are responsible for your prompts, content, and generated results.",
       "Do not use it to harm people, commit fraud, compromise systems, violate privacy, or infringe laws or third-party rights.",
@@ -34,7 +34,7 @@ export const agreement = {
     ],
     accept: "I agree and continue",
     reject: "I do not agree",
-    required: "Consent is required before any command can run.",
+    required: "Your consent is recorded after sign-in succeeds; commands remain unavailable until then.",
   },
 } as const;
 

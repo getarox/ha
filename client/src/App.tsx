@@ -7,12 +7,27 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Owner from "./pages/Owner";
+import { useAuth } from "@/_core/hooks/useAuth";
+
+function HomeEntry() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#050b14] text-sm text-slate-300" dir="rtl">
+        جاري التحقق من جلسة الدخول…
+      </main>
+    );
+  }
+
+  const hasRealLogin = user?.loginMethod === "google" || user?.loginMethod === "email" || user?.loginMethod === "phone";
+  return hasRealLogin ? <Home /> : <Login />;
+}
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={HomeEntry} />
       <Route path={"/owner"} component={Owner} />
       <Route path={"/login"} component={Login} />
       <Route path={"/404"} component={NotFound} />
