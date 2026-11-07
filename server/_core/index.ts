@@ -59,7 +59,12 @@ export async function createApp() {
   app.post("/api/consent/accept", async (req, res) => {
     const { sessionId, locale } = req.body ?? {};
     if (typeof sessionId !== "string" || sessionId.length < 8 || (locale !== "ar" && locale !== "en")) return res.status(400).json({ error: "بيانات الموافقة غير صالحة." });
-    return res.json(await acceptConsent(sessionId, locale));
+    try {
+      return res.json(await acceptConsent(sessionId, locale));
+    } catch (error) {
+      console.error("[Consent] Persistence failed", error);
+      return res.status(503).json({ error: "تعذر حفظ موافقتك على الاتفاقية في الوقت الحالي. حاول مجددًا." });
+    }
   });
 
   const chatBodySchema = z.object({

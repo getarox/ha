@@ -167,7 +167,7 @@ export async function getAurevionConsent(sessionKey: string) {
 
 export async function saveAurevionConsent(sessionKey: string, values: { version: string; locale: "ar" | "en"; acceptedAt: string }) {
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new Error("DATABASE_UNAVAILABLE");
   const existing = await getAurevionSession(sessionKey);
   const consent = { consentVersion: values.version, consentLocale: values.locale, consentAcceptedAt: new Date(values.acceptedAt) };
   if (existing) {

@@ -11,13 +11,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 
 function HomeEntry() {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#050b14] text-sm text-slate-300" dir="rtl">
-        جاري التحقق من جلسة الدخول…
-      </main>
-    );
-  }
+  if (loading) return <Login />;
 
   const hasRealLogin = user?.loginMethod === "google" || user?.loginMethod === "email" || user?.loginMethod === "phone";
   return hasRealLogin ? <Home /> : <Login />;

@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { firebaseAuth, googleProvider } from "@/lib/firebase";
 import { getAurevionSessionId, getConsentLocale } from "@/lib/session";
+import { agreement as agreementText } from "@shared/consent";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -16,7 +18,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 
 type AuthMode = "signin" | "signup";
-type AgreementCopy = { title: string; intro: string; bullets: readonly string[]; required: string };
 
 function safeReturnPath() {
   const next = new URLSearchParams(window.location.search).get("next");
@@ -57,24 +58,12 @@ async function createServerSession(user: User, sessionId: string, locale: "ar" |
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ idToken, sessionId, locale, acceptedTerms: true }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "تعذر إنشاء جلسة أوريفون.");
   }
-
-  const consentResponse = await fetch("/api/consent/accept", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, locale }),
-  });
-  const consentData = await consentResponse.json().catch(() => ({}));
-  if (!consentResponse.ok) {
-    throw new Error(typeof consentData.error === "string" ? consentData.error : "تعذر حفظ موافقتك على الاتفاقية.");
-  }
-
   window.location.replace(safeReturnPath());
 }
 
@@ -87,23 +76,12 @@ export default function Login() {
   const [notice, setNotice] = useState("");
   const [sessionId] = useState(getAurevionSessionId);
   const [locale] = useState(getConsentLocale);
-  const [agreement, setAgreement] = useState<AgreementCopy | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const agreement = agreementText[locale];
 
   useEffect(() => {
     document.title = "تسجيل الدخول | AUREVION";
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    void fetch(`/api/consent/status?sessionId=${encodeURIComponent(sessionId)}`, { credentials: "include" })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("agreement unavailable")))
-      .then((data) => {
-        const copy = data.agreement?.[locale] ?? data.agreement;
-        if (active && copy && typeof copy.title === "string") setAgreement(copy);
-      })
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, [locale, sessionId]);
 
   const run = async (operation: () => Promise<void>) => {
     setBusy(true);
@@ -126,6 +104,10 @@ export default function Login() {
 
   const submitEmail = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!acceptedTerms) {
+      setError("حدد مربع الموافقة على الاتفاقية قبل المتابعة.");
+      return;
+    }
     const normalizedEmail = email.trim().toLowerCase();
     return run(async () => {
       if (mode === "signup") {
@@ -199,33 +181,37 @@ export default function Login() {
             </div>
 
             <div className="mb-4 rounded-xl border border-cyan-200/15 bg-cyan-300/[0.04] p-3 text-xs leading-6 text-slate-300">
-              <p className="font-medium text-cyan-100">{agreement?.title ?? (locale === "en" ? "License and Safe Use Agreement" : "اتفاقية الترخيص والاستخدام الآمن")}</p>
-              <p className="mt-1">
-                {locale === "en"
-                  ? "By signing in or creating an account, you agree to this agreement. Your consent is recorded after sign-in succeeds; no separate acceptance step follows."
-                  : "بالضغط على تسجيل الدخول أو إنشاء الحساب، توافق على هذه الاتفاقية. تُسجّل موافقتك بعد نجاح الدخول، ولن تظهر خطوة قبول منفصلة بعد ذلك."}
-              </p>
-              <details className="mt-2">
-                <summary className="cursor-pointer select-none font-medium text-cyan-200 hover:text-white">
-                  {locale === "en" ? "Read the full agreement" : "قراءة الاتفاقية كاملة"}
-                </summary>
-                <div className="mt-3 max-h-52 space-y-3 overflow-y-auto pe-1 text-slate-300">
-                  {agreement ? (
-                    <>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="accept-terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  className="mt-1 size-5 border-slate-500 data-[state=checked]:border-blue-500 data-[state=checked]:bg-blue-500 data-[state=checked]:text-white"
+                />
+                <div className="min-w-0 flex-1">
+                  <label htmlFor="accept-terms" className="cursor-pointer font-medium text-cyan-100">
+                    {locale === "en" ? "I agree to " : "أوافق على "}{agreement.title}
+                  </label>
+                  <p className="mt-1 text-slate-400">
+                    {locale === "en" ? "Check the box, then choose a sign-in option. Consent is saved after sign-in succeeds." : "ضع علامة في المربع، ثم اختر طريقة الدخول. تُحفظ الموافقة بعد نجاح تسجيل الدخول."}
+                  </p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer select-none font-medium text-cyan-200 hover:text-white">
+                      {locale === "en" ? "Read the full agreement" : "قراءة الاتفاقية كاملة"}
+                    </summary>
+                    <div className="mt-3 max-h-52 space-y-3 overflow-y-auto pe-1 text-slate-300">
                       <p>{agreement.intro}</p>
                       <ul className="list-disc space-y-2 ps-5">
                         {agreement.bullets.map((bullet, index) => <li key={`${index}-${bullet}`}>{bullet}</li>)}
                       </ul>
                       <p className="text-amber-100">{agreement.required}</p>
-                    </>
-                  ) : (
-                    <p>{locale === "en" ? "Loading agreement text…" : "جارٍ تحميل نص الاتفاقية…"}</p>
-                  )}
+                    </div>
+                  </details>
                 </div>
-              </details>
+              </div>
             </div>
 
-            <Button type="button" onClick={() => void signInWithGoogle()} disabled={busy} className="h-12 w-full border border-white/15 bg-white text-slate-900 hover:bg-slate-100">
+            <Button type="button" onClick={() => void signInWithGoogle()} disabled={busy || !acceptedTerms} className="h-12 w-full border border-white/15 bg-white text-slate-900 hover:bg-slate-100">
               {busy ? <LoaderCircle className="size-4 animate-spin" /> : <GoogleMark />}
               المتابعة باستخدام Google
             </Button>
@@ -250,7 +236,7 @@ export default function Login() {
 
               {mode === "signin" && <div className="text-left"><button type="button" onClick={() => void resetPassword()} disabled={busy} className="text-xs text-cyan-200/80 transition hover:text-cyan-100 disabled:opacity-50">نسيت كلمة المرور؟</button></div>}
 
-              <Button type="submit" disabled={busy} className="h-11 w-full bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200">
+              <Button type="submit" disabled={busy || !acceptedTerms} className="h-11 w-full bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200">
                 {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {mode === "signin" ? "دخول إلى أوريفون" : "إنشاء الحساب"}
               </Button>

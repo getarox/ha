@@ -5,6 +5,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
 import { getUserByOpenId, upsertUser } from "./db.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { sdk } from "./_core/sdk.js";
+import { acceptConsent, type ConsentLocale } from "./consent.js";
 
 const FIREBASE_PROJECT_ID = "aurevion-auth-7b9eb";
 const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
@@ -93,6 +94,14 @@ export function registerFirebaseAuthRoutes(app: Express) {
     if (!idToken || idToken.length > 16_384) {
       return res.status(400).json({ error: "رمز Firebase مفقود أو غير صالح." });
     }
+    const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : "";
+    const locale = req.body.locale;
+    if (
+      sessionId.length < 8 || sessionId.length > 128 ||
+      (locale !== "ar" && locale !== "en") || req.body.acceptedTerms !== true
+    ) {
+      return res.status(400).json({ error: "حدد مربع الموافقة على الاتفاقية قبل تسجيل الدخول." });
+    }
 
     let payload: JWTPayload;
     try {
@@ -123,6 +132,13 @@ export function registerFirebaseAuthRoutes(app: Express) {
       const storedUser = await getUserByOpenId(identity.openId);
       if (!storedUser) {
         return res.status(503).json({ error: "خدمة الحسابات غير متاحة حاليًا. حاول لاحقًا." });
+      }
+
+      try {
+        await acceptConsent(sessionId, locale as ConsentLocale);
+      } catch (error) {
+        console.error("[Firebase Auth] Consent persistence failed", error);
+        return res.status(503).json({ error: "تعذر حفظ موافقتك على الاتفاقية في الوقت الحالي. حاول مجددًا." });
       }
 
       const sessionToken = await sdk.createSessionToken(identity.openId, {

@@ -23,7 +23,21 @@ async function requireOAuth(req: VercelRequest, res: VercelResponse) { try { awa
 
 export function health(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, service: "aurevion-vercel-api", cloud_fallback: "groq" }); }
 export async function consentStatus(req: VercelRequest, res: VercelResponse) { const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : ""; if (sessionId.length < 8) return res.status(400).json({ error: "sessionId غير صالح." }); return res.status(200).json({ agreement, ...(await getConsent(sessionId)) }); }
-export async function consentAccept(req: VercelRequest, res: VercelResponse) { const body = req.body ?? {}; if (req.method !== "POST" || typeof body.sessionId !== "string" || body.sessionId.length < 8 || (body.locale !== "ar" && body.locale !== "en")) return res.status(400).json({ error: "بيانات الموافقة غير صالحة." }); return res.status(200).json(await acceptConsent(body.sessionId, body.locale)); }
+export async function consentAccept(req: VercelRequest, res: VercelResponse) {
+  let body: any = req.body ?? {};
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+  if (req.method !== "POST" || typeof body.sessionId !== "string" || body.sessionId.length < 8 || (body.locale !== "ar" && body.locale !== "en")) {
+    return res.status(400).json({ error: "بيانات الموافقة غير صالحة." });
+  }
+  try {
+    return res.status(200).json(await acceptConsent(body.sessionId, body.locale));
+  } catch (error) {
+    console.error("[Consent] Persistence failed", error);
+    return res.status(503).json({ error: "تعذر حفظ موافقتك على الاتفاقية في الوقت الحالي. حاول مجددًا." });
+  }
+}
 function cors(req: VercelRequest, res: VercelResponse) {
   const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
   const host = typeof req.headers.host === "string" ? req.headers.host : "";
