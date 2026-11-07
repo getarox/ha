@@ -8,6 +8,7 @@ let _db: ReturnType<typeof drizzle> | null = null;
 let _schemaReady: Promise<void> | null = null;
 
 async function ensureOperationalSchema(pool: mysql.Pool) {
+  const promisePool = pool.promise();
   const statements = [
     "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
     "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `consentVersion` varchar(64), `consentLocale` varchar(8), `consentAcceptedAt` timestamp NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
@@ -23,7 +24,7 @@ async function ensureOperationalSchema(pool: mysql.Pool) {
     "CREATE TABLE IF NOT EXISTS `aurevion_feedback` (`id` int AUTO_INCREMENT NOT NULL, `category` enum('support','bug','safety','feedback') NOT NULL, `message` text NOT NULL, `sessionId` varchar(128), `userEmail` varchar(320), `status` enum('new','reviewing','resolved') NOT NULL DEFAULT 'new', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_feedback_id` PRIMARY KEY(`id`))",
   ];
   for (const statement of statements) {
-    try { await pool.query(statement); }
+    try { await promisePool.query(statement); }
     catch (error) { console.error("[Database] Schema statement failed:", error); throw error; }
   }
 }
@@ -33,7 +34,7 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const u = new URL(process.env.DATABASE_URL);
-      const client = await mysql.createPool({
+      const client = mysql.createPool({
         host: u.hostname,
         port: Number(u.port || 4000),
         user: decodeURIComponent(u.username),
