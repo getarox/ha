@@ -34,7 +34,7 @@ describe("mapFirebaseTokenClaims", () => {
     });
   });
 
-  it("rejects unverified emails and unsupported Firebase providers", () => {
+  it("maps verified phone accounts to Firebase phone identities", () => {
     expect(mapFirebaseTokenClaims({
       sub: "firebase-user-123",
       email: "user@example.com",
@@ -43,10 +43,15 @@ describe("mapFirebaseTokenClaims", () => {
     })).toBeNull();
     expect(mapFirebaseTokenClaims({
       sub: "firebase-user-123",
-      email: "user@example.com",
+      phone_number: "+9647000000000",
       email_verified: true,
       firebase: { sign_in_provider: "phone" },
-    })).toBeNull();
+    })).toEqual({
+      openId: "firebase:firebase-user-123",
+      name: "+9647000000000",
+      email: "+9647000000000",
+      loginMethod: "phone",
+    });
   });
 
   it("keeps long Firebase UIDs within the database openId column limit", () => {

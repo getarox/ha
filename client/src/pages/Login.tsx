@@ -5,16 +5,19 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  signInWithPhoneNumber,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  RecaptchaVerifier,
+  type ConfirmationResult,
   type User,
 } from "firebase/auth";
 import { ArrowLeft, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 
-type AuthMode = "signin" | "signup";
+type AuthMode = "signin" | "signup" | "phone";
 
 function safeReturnPath() {
   const next = new URLSearchParams(window.location.search).get("next");
@@ -45,6 +48,9 @@ function firebaseErrorMessage(error: unknown) {
     "auth/popup-blocked": "حظر المتصفح النافذة المنبثقة. اسمح بها ثم أعد المحاولة.",
     "auth/operation-not-allowed": "طريقة تسجيل الدخول هذه غير مفعّلة في إعدادات Firebase.",
     "auth/network-request-failed": "تعذر الاتصال. تحقق من الإنترنت وحاول مجددًا.",
+    "auth/invalid-phone-number": "اكتب الرقم بصيغة دولية، مثل +9647xxxxxxxxx.",
+    "auth/code-expired": "انتهت صلاحية الرمز. أرسل رمزاً جديداً.",
+    "auth/invalid-verification-code": "رمز التحقق غير صحيح.",
   };
   return messages[code] ?? "تعذر تسجيل الدخول الآن. تحقق من إعداد Firebase وحاول مجددًا.";
 }
@@ -68,12 +74,17 @@ export default function Login() {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     document.title = "تسجيل الدخول | AUREVION";
+    return () => recaptchaRef.current?.clear();
   }, []);
 
   const run = async (operation: () => Promise<void>) => {
@@ -92,6 +103,19 @@ export default function Login() {
 
   const signInWithGoogle = () => run(async () => {
     const credential = await signInWithPopup(firebaseAuth, googleProvider);
+    await createServerSession(credential.user);
+  });
+
+  const sendPhoneCode = () => run(async () => {
+    recaptchaRef.current?.clear();
+    recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, "firebase-phone-recaptcha", { size: "invisible" });
+    setConfirmation(await signInWithPhoneNumber(firebaseAuth, phone.trim(), recaptchaRef.current));
+    setNotice("أرسلنا رمز تحقق إلى رقم هاتفك.");
+  });
+
+  const verifyPhoneCode = () => run(async () => {
+    if (!confirmation) return;
+    const credential = await confirmation.confirm(verificationCode.trim());
     await createServerSession(credential.user);
   });
 
@@ -165,8 +189,8 @@ export default function Login() {
           <div className="rounded-3xl border border-cyan-200/15 bg-slate-950/75 p-6 shadow-[0_25px_100px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
             <div className="mb-7">
               <p className="text-xs tracking-[0.2em] text-cyan-200/60">AUREVION / ACCOUNT</p>
-              <h2 className="mt-3 text-2xl font-semibold text-white">{mode === "signin" ? "تسجيل الدخول" : "إنشاء حساب"}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">{mode === "signin" ? "اختر طريقة الدخول المناسبة لك." : "أنشئ حسابًا جديدًا للبدء مع أوريفون."}</p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">{mode === "signup" ? "إنشاء حساب" : "تسجيل الدخول"}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">اختر Google أو البريد الإلكتروني أو رقم الهاتف.</p>
             </div>
 
             <Button type="button" onClick={() => void signInWithGoogle()} disabled={busy} className="h-12 w-full border border-white/15 bg-white text-slate-900 hover:bg-slate-100">
@@ -174,9 +198,9 @@ export default function Login() {
               المتابعة باستخدام Google
             </Button>
 
-            <div className="my-6 flex items-center gap-3 text-[11px] text-slate-500"><span className="h-px flex-1 bg-white/10" /><span>أو باستخدام البريد الإلكتروني</span><span className="h-px flex-1 bg-white/10" /></div>
+            <div className="my-6 grid grid-cols-2 gap-2"><Button type="button" variant={mode === "phone" ? "default" : "outline"} onClick={() => { setMode("phone"); setConfirmation(null); setError(""); setNotice(""); }}>الهاتف</Button><Button type="button" variant={mode !== "phone" ? "default" : "outline"} onClick={() => { setMode("signin"); setConfirmation(null); setError(""); setNotice(""); }}>البريد الإلكتروني</Button></div>
 
-            <form onSubmit={submitEmail} className="space-y-4">
+            {mode === "phone" ? <div className="space-y-4"><label className="block space-y-2 text-sm text-slate-300"><span>رقم الهاتف بصيغة دولية</span><Input type="tel" inputMode="tel" required value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+9647xxxxxxxxx" dir="ltr" className="h-11 border-white/10 bg-white/[0.04] text-white placeholder:text-slate-600" /></label>{confirmation ? <><Input inputMode="numeric" required value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="رمز SMS" dir="ltr" className="h-11 border-white/10 bg-white/[0.04] text-white" /><Button type="button" disabled={busy} onClick={() => void verifyPhoneCode()} className="h-11 w-full bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200">{busy ? <LoaderCircle className="size-4 animate-spin" /> : null}تأكيد الرمز</Button></> : <Button type="button" disabled={busy} onClick={() => void sendPhoneCode()} className="h-11 w-full bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200">{busy ? <LoaderCircle className="size-4 animate-spin" /> : null}إرسال رمز التحقق</Button>}<div id="firebase-phone-recaptcha" /></div> : <form onSubmit={submitEmail} className="space-y-4">
               <label className="block space-y-2 text-sm text-slate-300">
                 <span>البريد الإلكتروني</span>
                 <span className="relative block">
@@ -198,13 +222,13 @@ export default function Login() {
                 {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {mode === "signin" ? "دخول إلى أوريفون" : "إنشاء الحساب"}
               </Button>
-            </form>
+            </form>}
 
             {error && <p role="alert" className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/[0.06] p-3 text-sm leading-6 text-rose-100">{error}</p>}
             {notice && <p role="status" className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.06] p-3 text-sm leading-6 text-emerald-100">{notice}</p>}
 
             <p className="mt-6 text-center text-sm text-slate-400">
-              {mode === "signin" ? "ليس لديك حساب؟" : "لديك حساب بالفعل؟"}{" "}
+              {mode === "phone" ? "" : mode === "signin" ? "ليس لديك حساب؟" : "لديك حساب بالفعل؟"}{" "}
               <button type="button" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setNotice(""); }} className="font-medium text-cyan-200 hover:text-white">
                 {mode === "signin" ? "أنشئ حسابًا" : "سجّل الدخول"}
               </button>

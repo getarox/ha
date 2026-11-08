@@ -16,7 +16,7 @@ type FirebaseIdentity = {
   openId: string;
   name: string;
   email: string;
-  loginMethod: "google" | "email";
+  loginMethod: "google" | "email" | "phone";
 };
 
 function stringClaim(value: unknown): string | null {
@@ -37,8 +37,8 @@ function openIdForFirebaseUser(uid: string, loginMethod: FirebaseIdentity["login
 
 export function mapFirebaseTokenClaims(payload: JWTPayload): FirebaseIdentity | null {
   const uid = stringClaim(payload.sub);
-  const email = stringClaim(payload.email)?.toLowerCase() ?? null;
-  const verified = payload.email_verified === true;
+  const email = stringClaim(payload.email)?.toLowerCase() ?? stringClaim(payload.phone_number);
+  const verified = payload.email_verified === true || Boolean(payload.phone_number);
   const firebase = payload.firebase && typeof payload.firebase === "object"
     ? payload.firebase as Record<string, unknown>
     : {};
@@ -47,6 +47,8 @@ export function mapFirebaseTokenClaims(payload: JWTPayload): FirebaseIdentity | 
     ? "google"
     : signInProvider === "password"
       ? "email"
+      : signInProvider === "phone"
+        ? "phone"
       : null;
 
   if (!uid || !email || !verified || !loginMethod) return null;
@@ -109,7 +111,7 @@ export function registerFirebaseAuthRoutes(app: Express) {
 
     const identity = mapFirebaseTokenClaims(payload);
     if (!identity) {
-      return res.status(403).json({ error: "يجب استخدام Google أو بريد إلكتروني موثّق لتسجيل الدخول." });
+      return res.status(403).json({ error: "يجب استخدام Google أو بريد إلكتروني موثّق أو رقم هاتف لتسجيل الدخول." });
     }
 
     try {
