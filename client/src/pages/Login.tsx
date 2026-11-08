@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { firebaseAuth, googleProvider } from "@/lib/firebase";
 import {
@@ -81,6 +82,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     document.title = "تسجيل الدخول | AUREVION";
@@ -102,11 +104,13 @@ export default function Login() {
   };
 
   const signInWithGoogle = () => run(async () => {
+    if (!termsAccepted) throw new Error("وافق على اتفاقية الاستخدام أولاً.");
     const credential = await signInWithPopup(firebaseAuth, googleProvider);
     await createServerSession(credential.user);
   });
 
   const sendPhoneCode = () => run(async () => {
+    if (!termsAccepted) throw new Error("وافق على اتفاقية الاستخدام أولاً.");
     recaptchaRef.current?.clear();
     recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, "firebase-phone-recaptcha", { size: "invisible" });
     setConfirmation(await signInWithPhoneNumber(firebaseAuth, phone.trim(), recaptchaRef.current));
@@ -121,6 +125,10 @@ export default function Login() {
 
   const submitEmail = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!termsAccepted) {
+      setError("وافق على اتفاقية الاستخدام أولاً.");
+      return;
+    }
     const normalizedEmail = email.trim().toLowerCase();
     return run(async () => {
       if (mode === "signup") {
@@ -197,6 +205,11 @@ export default function Login() {
               {busy ? <LoaderCircle className="size-4 animate-spin" /> : <GoogleMark />}
               المتابعة باستخدام Google
             </Button>
+
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs leading-6 text-slate-300">
+              <Checkbox checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} className="mt-1 border-cyan-300/50 data-[state=checked]:border-cyan-300 data-[state=checked]:bg-cyan-300 data-[state=checked]:text-slate-950" />
+              <span>أوافق على <button type="button" className="font-medium text-cyan-200 underline underline-offset-2" onClick={(event) => { event.preventDefault(); window.alert("باستخدام AUREVION، توافق على شروط الاستخدام وسياسة الخصوصية، وتتعهد بعدم استخدام الخدمة للأنشطة غير القانونية أو الضارة."); }}>اتفاقية الاستخدام وسياسة الخصوصية</button> الخاصة بـ AUREVION.</span>
+            </label>
 
             <div className="my-6 grid grid-cols-2 gap-2"><Button type="button" variant={mode === "phone" ? "default" : "outline"} onClick={() => { setMode("phone"); setConfirmation(null); setError(""); setNotice(""); }}>الهاتف</Button><Button type="button" variant={mode !== "phone" ? "default" : "outline"} onClick={() => { setMode("signin"); setConfirmation(null); setError(""); setNotice(""); }}>البريد الإلكتروني</Button></div>
 
