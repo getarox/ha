@@ -2,7 +2,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDfjM1CSGkYKD-zfGNIx9gniIKswxFvvxk",
+  apiKey: "AIzaSyDDBdKx7uFBpGLil7vT5jYj9p420OpSC6w",
   authDomain: "aurevion-auth.firebaseapp.com",
   projectId: "aurevion-auth",
   storageBucket: "aurevion-auth.firebasestorage.app",
