@@ -2,12 +2,12 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDDBdKx7uFBpGLil7vT5jYj9p420OpSC6w",
-  authDomain: "aurevion-auth.firebaseapp.com",
-  projectId: "aurevion-auth",
-  storageBucket: "aurevion-auth.firebasestorage.app",
-  messagingSenderId: "988565270032",
-  appId: "1:988565270032:web:56063a428d0db309e4e495",
+  apiKey: "AIzaSyBjDf2CpgkOAyzJ-eu_dQOCAKc-fI2VpXk",
+  authDomain: "aurevion-auth-7b9eb.firebaseapp.com",
+  projectId: "aurevion-auth-7b9eb",
+  storageBucket: "aurevion-auth-7b9eb.firebasestorage.app",
+  messagingSenderId: "636144911156",
+  appId: "1:636144911156:web:be5891a3649c9d3e959b61",
 };
 
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);

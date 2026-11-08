@@ -6,7 +6,7 @@ import { getUserByOpenId, upsertUser } from "./db.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { sdk } from "./_core/sdk.js";
 
-const FIREBASE_PROJECT_ID = "aurevion-auth";
+const FIREBASE_PROJECT_ID = "aurevion-auth-7b9eb";
 const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
 const FIREBASE_JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
