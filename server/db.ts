@@ -7,7 +7,7 @@ import { ENV } from './_core/env.js';
 let _db: ReturnType<typeof drizzle> | null = null;
 let _schemaReady: Promise<void> | null = null;
 
-async function ensureOperationalSchema(pool: mysql.Pool) {
+async function ensureOperationalSchema(pool: { query: (sql: string) => Promise<unknown> }) {
   const statements = [
     "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
     "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `consentVersion` varchar(64), `consentLocale` varchar(8), `consentAcceptedAt` timestamp NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
@@ -44,7 +44,7 @@ export async function getDb() {
         connectTimeout: 10_000,
         ssl: { rejectUnauthorized: true },
       });
-      _schemaReady = ensureOperationalSchema(client).catch((error) => {
+      _schemaReady = ensureOperationalSchema(client.promise()).catch((error) => {
         _schemaReady = null;
         throw error;
       });
