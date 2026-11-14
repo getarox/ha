@@ -2,12 +2,14 @@ import { TRPCError } from "@trpc/server";
 import { randomUUID } from "node:crypto";
 import { ENV } from "./_core/env.js";
 import { createAurevionSession, getAurevionSession, updateAurevionSession } from "./db.js";
-import { chargeUsage } from "./billing.js";
+import { reserveNeuronBalance, refundNeuronReservation, reserveCloudflareUsage, releaseCloudflareUsage, reserveFreeImage, releaseFreeImage, neuronBalance, freeImagesRemaining } from "./billing.js";
 
 export type ImageStudioMode = "generate" | "edit" | "analyze" | "evaluate";
 
 type ImageStudioInput = {
   sessionId: string;
+  firebaseUid?: string;
+  resolution?: 512 | 1024;
   mode: ImageStudioMode;
   prompt: string;
   imageBase64?: string;
@@ -45,7 +47,7 @@ async function ensureSession(sessionId: string) {
   return undefined;
 }
 
-async function checkImageQuota(sessionId: string, requestedPro: boolean) {
+async function checkImageQuota(sessionId: string, requestedPro: boolean, enforceSessionLimit = true) {
   const persisted = await ensureSession(sessionId);
   const memory = getMemoryState(cleanSessionId(sessionId));
   const plan = persisted?.plan ?? memory.plan;
@@ -54,7 +56,7 @@ async function checkImageQuota(sessionId: string, requestedPro: boolean) {
   }
   const limit = plan === "pro" ? ENV.proImageLimit : ENV.freeImageLimit;
   const used = persisted?.imagesUsed ?? memory.imagesUsed;
-  if (used >= limit) {
+  if (enforceSessionLimit && used >= limit) {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `انتهت حصة الصور لهذه الخطة (${limit}).` });
   }
   return { plan, used, limit, persisted };
@@ -113,38 +115,6 @@ async function callGroqVision(input: ImageStudioInput, model: string) {
   return { kind: "text" as const, text: payload.choices?.[0]?.message?.content ?? "لم أستطع استخراج تقييم من الصورة." };
 }
 
-async function enhanceImagePrompt(prompt: string) {
-  if (!ENV.groqApiKey || process.env.NODE_ENV === "test") return prompt;
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${ENV.groqApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: ENV.groqModel, temperature: 0.35, max_tokens: 700, messages: [
-        { role: "system", content: "You are a professional image prompt engineer. Rewrite the user's request into one precise, vivid English prompt for an image generator. Preserve every requested subject, action, setting, culture, and mood. Never add people, genders, text, logos, or objects that were not requested. If the subject is a cat, explicitly say cat, never scene or woman. Return only the final prompt, no explanation." },
-        { role: "user", content: prompt },
-      ] }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) return prompt;
-    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const enhanced = payload.choices?.[0]?.message?.content?.trim();
-    return enhanced && enhanced.length >= 10 && enhanced.length <= 4000 ? enhanced : prompt;
-  } catch (error) {
-    console.warn("[ImageStudio] Prompt enhancement unavailable; using original prompt", error);
-    return prompt;
-  }
-}
-
-async function callPollinationsImage(input: ImageStudioInput) {
-  const endpoint = ENV.pollinationsEndpoint.replace(/\/+$/, "");
-  const clarifiedPrompt = /لقطة|قطه/i.test(input.prompt)
-    ? `${input.prompt.replace(/لقطة|قطه/gi, "قطة")}، قطة حقيقية نائمة بوضوح، بدون أي أشخاص أو نساء أو وجوه بشرية`
-    : input.prompt;
-  const prompt = await enhanceImagePrompt(clarifiedPrompt);
-  const url = `${endpoint}/${encodeURIComponent(prompt)}?model=${encodeURIComponent(ENV.pollinationsModel)}&nologo=true`;
-  return { kind: "image" as const, text: "تم إنشاء الصورة عبر Pollinations AI.", imageDataUrl: url };
-}
-
 export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
   if (mode === "analyze" || mode === "evaluate") return pro ? ENV.groqProVisionModel : ENV.groqVisionModel;
   return pro ? ENV.geminiProImageModel : ENV.geminiImageModel;
@@ -152,27 +122,54 @@ export function getImageStudioModel(mode: ImageStudioMode, pro: boolean) {
 
 export async function runImageStudio(input: ImageStudioInput) {
   if (input.prompt.trim().length < 2 || input.prompt.length > 4000) throw new TRPCError({ code: "BAD_REQUEST", message: "وصف الصورة غير صالح." });
-  if (input.imageBase64) {
-    if (input.imageBase64.length > 6_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الصورة كبير جدًا. استخدم صورة أقل من 4MB." });
-    if (input.mimeType && !["image/png", "image/jpeg", "image/webp"].includes(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: "نوع الصورة غير مدعوم." });
+  if (input.imageBase64 && input.imageBase64.length > 6_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الصورة كبير جدًا." });
+  if (input.imageBase64 && input.mimeType && !["image/png", "image/jpeg", "image/webp"].includes(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: "نوع الصورة غير مدعوم." });
+  if (input.mode === "edit" && !input.imageBase64) throw new TRPCError({ code: "BAD_REQUEST", message: "أرفق صورة للتحرير." });
+  if ((input.mode === "generate" || input.mode === "edit") && !input.firebaseUid) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "تعذر تحديد حساب Firebase الموثق." });
+  const quotaCheck = await checkImageQuota(input.sessionId, false, input.mode !== "generate" && input.mode !== "edit");
+  const model = getImageStudioModel(input.mode, quotaCheck.plan === "pro");
+  if (input.mode !== "generate" && input.mode !== "edit") {
+    const result = await callGroqVision(input, model);
+    const quota = await consumeImageQuota(input.sessionId, quotaCheck); return { ...result, provider: input.mode === "analyze" ? "groq" : "groq", plan: quota.plan, remaining: quota.remaining, model };
   }
-  const quotaCheck = await checkImageQuota(input.sessionId, Boolean(input.pro));
-  const model = getImageStudioModel(input.mode, Boolean(input.pro));
-  let provider = "groq";
-  let result;
-  if (input.mode === "analyze" || input.mode === "evaluate") {
-    result = await callGroqVision(input, model);
-  } else if (input.mode === "generate" && !input.pro) {
-    result = await callPollinationsImage(input); provider = "pollinations";
-  } else {
-    result = await callGeminiImage(input, model); provider = "gemini";
+  const uid=input.firebaseUid!; const size=input.resolution===1024 ? 1024 : 512; const cost=Number(((size===1024?104.20:26.05)+(input.mode==="edit"?5.37:0)).toFixed(2)); const requestId=randomUUID();
+  let paidMode = false; let neuronReserved=false;
+  if (process.env.NODE_ENV !== "test") {
+    const balance=await neuronBalance(uid); const freeLeft=await freeImagesRemaining(uid); paidMode=size===1024 || freeLeft<=0;
+    if(paidMode && balance<cost) throw new TRPCError({code:"PAYMENT_REQUIRED",message:freeLeft<=0 ? "انتهت الصور المجانية اليومية ورصيد Neurons غير كافٍ." : "رصيد Neurons غير كافٍ للدقة المطلوبة."});
+    if(paidMode) { try { await reserveNeuronBalance(uid,cost,requestId); neuronReserved=true; } catch(e) { const m=(e as Error).message; throw new TRPCError({code:m==="INSUFFICIENT_NEURONS"?"PAYMENT_REQUIRED":"PRECONDITION_FAILED",message:m==="INSUFFICIENT_NEURONS"?"رصيد Neurons غير كافٍ.":"خدمة الرصيد غير متاحة."}); } }
   }
-  const isHeavyTask = input.mode !== "generate" || Boolean(input.pro);
-  const requiresWalletCharge = provider !== "pollinations" && (ENV.walletEnforce || isHeavyTask);
-  if (requiresWalletCharge && process.env.NODE_ENV !== "test") {
-    try { await chargeUsage(input.sessionId, "image", provider, model, randomUUID()); }
-    catch { throw new TRPCError({ code: "PAYMENT_REQUIRED", message: "رصيد المحفظة غير كافٍ." }); }
+  let freeReservation: string|undefined; let cloudReservation: string|undefined; let workerSuccess=false;
+  if(process.env.NODE_ENV!=="test") {
+    if(!paidMode) { try { freeReservation=await reserveFreeImage(uid); } catch(e) { const m=(e as Error).message; if(m==="FREE_DAILY_QUOTA") { const balance=await neuronBalance(uid); if(balance>=cost) { paidMode=true; try { await reserveNeuronBalance(uid,cost,requestId); neuronReserved=true; } catch(reserveError) { const reserveMessage=(reserveError as Error).message; throw new TRPCError({code:reserveMessage==="INSUFFICIENT_NEURONS"?"PAYMENT_REQUIRED":"PRECONDITION_FAILED",message:reserveMessage==="INSUFFICIENT_NEURONS"?"رصيد Neurons غير كافٍ.":"خدمة الرصيد غير متاحة."}); } } else throw new TRPCError({code:"TOO_MANY_REQUESTS",message:"استهلكت حدك المجاني: 3 صور يوميًا بدقة 512×512."}); } else throw new TRPCError({code:"PRECONDITION_FAILED",message:"خدمة الحصص غير متاحة."}); } }
+    try { cloudReservation=await reserveCloudflareUsage(cost); }
+    catch(e) {
+      if(freeReservation) await releaseFreeImage(uid,freeReservation);
+      if(neuronReserved) await refundNeuronReservation(uid,cost,requestId);
+      const m=(e as Error).message; throw new TRPCError({code:m==="CLOUDFLARE_DAILY_CAP"?"TOO_MANY_REQUESTS":"PRECONDITION_FAILED",message:m==="CLOUDFLARE_DAILY_CAP"?"تم بلوغ سقف Cloudflare اليومي.":"خدمة الحصص غير متاحة."});
+    }
   }
-  const quota = await consumeImageQuota(input.sessionId, quotaCheck);
-  return { ...result, provider, plan: quota.plan, remaining: quota.remaining, model: provider === "pollinations" ? "pollinations.ai" : model };
+  let result:any; let provider="cloudflare";
+  try {
+    if(!ENV.imageWorkerUrl || !ENV.imageWorkerSecret) throw new Error("WORKER_NOT_CONFIGURED");
+    const inputMimeType=input.mimeType??(input.imageBase64?decodeDataUrl(input.imageBase64).mimeType:undefined);
+    const response=await fetch(ENV.imageWorkerUrl,{method:"POST",headers:{"Content-Type":"application/json","X-AUREVION-WORKER-SECRET":ENV.imageWorkerSecret},body:JSON.stringify({model:"@cf/black-forest-labs/flux-2-klein-4b",prompt:input.prompt,width:size,height:size,inputImageBase64:input.mode==="edit"?input.imageBase64:undefined,inputImageMimeType:inputMimeType}),signal:AbortSignal.timeout(60000)});
+    if(!response.ok) {
+      const details=await response.text().catch(()=>"");
+      if(["CLOUDFLARE_DAILY_QUOTA","CLOUDFLARE_NEURON_LIMIT","DAILY_NEURON_LIMIT"].some(code=>details.includes(code)) || (response.status===429 && /neuron|daily.{0,20}quota|quota.{0,20}daily/i.test(details))) { const e:any=new Error("WORKER_QUOTA");e.entitlement=true;throw e; }
+      throw new Error(`WORKER_TECHNICAL_${response.status}`);
+    }
+    const data=await response.json() as {image?:unknown}; if(typeof data.image!=="string"||! /^[A-Za-z0-9+/=]+$/.test(data.image)) throw new Error("WORKER_INVALID_IMAGE");
+    result={kind:"image",text:"تم إنشاء الصورة عبر Cloudflare Workers AI.",imageDataUrl:`data:image/png;base64,${data.image}`}; workerSuccess=true;
+  } catch(error:any) {
+    if(error?.entitlement) { if(cloudReservation) await releaseCloudflareUsage(cost,cloudReservation); if(freeReservation) await releaseFreeImage(uid,freeReservation); if(neuronReserved) await refundNeuronReservation(uid,cost,requestId); throw new TRPCError({code:"TOO_MANY_REQUESTS",message:"تم بلوغ حصة Neurons اليومية لدى Cloudflare."}); }
+    if(cloudReservation) await releaseCloudflareUsage(cost,cloudReservation); cloudReservation=undefined;
+    provider="gemini";
+    try { result=await callGeminiImage(input,size===1024?ENV.geminiProImageModel:ENV.geminiImageModel); if (!result.imageDataUrl) throw new Error("GEMINI_NO_IMAGE"); }
+    catch(geminiError) { if(freeReservation) await releaseFreeImage(uid,freeReservation); if(neuronReserved) await refundNeuronReservation(uid,cost,requestId); throw geminiError; }
+  }
+  try {
+    const quota=paidMode ? {plan:"pro" as const,remaining:await freeImagesRemaining(uid)} : {plan:"free" as const,remaining:process.env.NODE_ENV === "test" ? 2 : await freeImagesRemaining(uid)};
+    return {...result,provider,plan:quota.plan,remaining:quota.remaining,model:workerSuccess?"@cf/black-forest-labs/flux-2-klein-4b":(size===1024?ENV.geminiProImageModel:ENV.geminiImageModel),neuronCost:cost};
+  } catch(error) { if(freeReservation) await releaseFreeImage(uid,freeReservation); if(neuronReserved) await refundNeuronReservation(uid,cost,requestId); throw error; }
 }

@@ -27,6 +27,8 @@ export const ENV = {
   allowedOrigins: (process.env.AUREVION_ALLOWED_ORIGINS ?? "https://aurevion-project.vercel.app,http://localhost:3000").split(",").map(origin => origin.trim()).filter(Boolean),
   freeMessageLimit: Number(process.env.AUREVION_FREE_MESSAGE_LIMIT ?? (process.env.NODE_ENV === "test" ? 25 : 0)),
   proMessageLimit: Number(process.env.AUREVION_PRO_MESSAGE_LIMIT ?? 500),
+  imageWorkerUrl: process.env.AUREVION_IMAGE_WORKER_URL ?? "",
+  imageWorkerSecret: process.env.AUREVION_IMAGE_WORKER_SECRET ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiImageModel: process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image",
   geminiProImageModel: process.env.GEMINI_PRO_IMAGE_MODEL ?? "gemini-3-pro-image",

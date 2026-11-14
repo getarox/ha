@@ -15,6 +15,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (path === "/api/consent/accept") return handlers.consentAccept(req, res);
   if (path === "/api/chat") return handlers.chat(req, res);
   if (path === "/api/image") return handlers.image(req, res);
+  if (path === "/api/image/balance") return handlers.imageBalance(req, res);
+  if (path === "/api/payments/packages") return handlers.neuronPackageCreate(req, res);
   if (path === "/api/wallet") return handlers.wallet(req, res);
   if (path === "/api/payments/create") return handlers.paymentCreate(req, res);
   if (path === "/api/payments/callback") return handlers.paymentCallback(req, res);

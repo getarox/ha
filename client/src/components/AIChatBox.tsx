@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import { prepareImageForWorker } from "@/lib/prepareImage";
 
 /** Browser APIs are intentionally structural so older browsers remain build-safe. */
 type SpeechRecognitionResultLike = ArrayLike<ArrayLike<{ transcript: string }>>;
@@ -216,7 +217,9 @@ export function AIChatBox({
     const attachmentText = textParts.length ? `\n\n[محتوى المرفقات]\n${textParts.join("\n\n")}` : "";
     const imageFile = files.find((file) => file.type.startsWith("image/"));
     if (imageFile && onAnalyzeImage) {
-      const imageDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error("تعذر قراءة الصورة.")); reader.readAsDataURL(imageFile); });
+      let imageDataUrl: string;
+      try { imageDataUrl = await prepareImageForWorker(imageFile); }
+      catch { setRecordingStatus("تعذر تجهيز الصورة المرفقة. جرّب صورة بصيغة PNG أو JPG أو WebP."); return; }
       const prompt = trimmedInput || "حلل هذه الصورة واذكر أهم التفاصيل والملاحظات.";
       setInput(""); setSelectedFiles([]); setRecordingStatus("جارٍ تحليل الصورة…");
       await onAnalyzeImage(imageDataUrl, prompt);
