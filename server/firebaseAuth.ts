@@ -14,6 +14,7 @@ const FIREBASE_JWKS = createRemoteJWKSet(
 
 type FirebaseIdentity = {
   openId: string;
+  firebaseUid: string;
   name: string;
   email: string;
   loginMethod: "google" | "email" | "phone";
@@ -56,6 +57,7 @@ export function mapFirebaseTokenClaims(payload: JWTPayload): FirebaseIdentity | 
   const name = stringClaim(payload.name) ?? email;
   return {
     openId: openIdForFirebaseUser(uid, loginMethod, firebase.identities),
+    firebaseUid: uid,
     name,
     email,
     loginMethod,
@@ -117,6 +119,7 @@ export function registerFirebaseAuthRoutes(app: Express) {
     try {
       await upsertUser({
         openId: identity.openId,
+        firebaseUid: identity.firebaseUid,
         name: identity.name,
         email: identity.email,
         loginMethod: identity.loginMethod,

@@ -14,6 +14,7 @@ describe("mapFirebaseTokenClaims", () => {
       },
     })).toEqual({
       openId: "google:google-sub-456",
+      firebaseUid: "firebase-user-123",
       name: "Aurevion User",
       email: "user@example.com",
       loginMethod: "google",
@@ -28,6 +29,7 @@ describe("mapFirebaseTokenClaims", () => {
       firebase: { sign_in_provider: "password" },
     })).toEqual({
       openId: "firebase:firebase-user-123",
+      firebaseUid: "firebase-user-123",
       name: "user@example.com",
       email: "user@example.com",
       loginMethod: "email",
@@ -48,6 +50,7 @@ describe("mapFirebaseTokenClaims", () => {
       firebase: { sign_in_provider: "phone" },
     })).toEqual({
       openId: "firebase:firebase-user-123",
+      firebaseUid: "firebase-user-123",
       name: "+9647000000000",
       email: "+9647000000000",
       loginMethod: "phone",

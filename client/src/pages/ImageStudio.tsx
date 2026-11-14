@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowUpRight, ImagePlus, Loader2, Sparkles, Upload, WandSparkles } from "lucide-react";
+import { prepareImageForWorker } from "@/lib/prepareImage";
 
 const modes = [
   { id: "generate", label: "بناء صورة", hint: "أنشئ صورة من وصفك" },
@@ -13,6 +14,8 @@ const modes = [
 export default function ImageStudio() {
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("generate");
   const [prompt, setPrompt] = useState("");
+  const [resolution, setResolution] = useState<512 | 1024>(512);
+  const [balanceInfo, setBalanceInfo] = useState<{ neurons: number; freeImagesRemaining: number }>();
   const [imageBase64, setImageBase64] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
   const [sessionId] = useState(() => `studio-${crypto.randomUUID()}`);
@@ -21,22 +24,22 @@ export default function ImageStudio() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
-  const handleFile = (file?: File) => {
+  useEffect(() => { void fetch("/api/image/balance").then(r => r.ok ? r.json() : null).then(d => d && setBalanceInfo(d)).catch(() => undefined); }, []);
+
+  const handleFile = async (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = String(reader.result);
+    try {
+      const value = await prepareImageForWorker(file);
       setImageBase64(value);
       setPreviewUrl(value);
-    };
-    reader.readAsDataURL(file);
+    } catch (error: any) { setError(error?.message || "تعذر تجهيز الصورة المرجعية."); }
   };
 
   const handleSubmit = async () => {
     if (!prompt.trim() || pending) return;
     setPending(true); setError(undefined);
     try {
-      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt: prompt.trim(), imageBase64, pro: false }) });
+      const response = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, mode, prompt: prompt.trim(), imageBase64, resolution }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "تعذر تنفيذ عملية الصور.");
       setResult(data);
@@ -65,6 +68,7 @@ export default function ImageStudio() {
               {modes.map((item) => <button key={item.id} onClick={() => setMode(item.id)} className={`rounded-2xl border p-4 text-right transition ${mode === item.id ? "border-cyan-300/60 bg-cyan-300/10" : "border-white/10 bg-slate-950/30 hover:border-white/25"}`}><p className="font-medium">{item.label}</p><p className="mt-2 text-xs text-slate-500">{item.hint}</p></button>)}
             </div>
 
+            {(mode === "generate" || mode === "edit") && <div className="mt-5"><label className="block text-sm text-slate-300">دقة الصورة</label><select value={resolution} onChange={e => setResolution(Number(e.target.value) as 512 | 1024)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-white"><option value={512}>512×512 — افتراضي · حتى 3 صور مجانية يوميًا</option><option value={1024} disabled={!balanceInfo || balanceInfo.neurons < (mode === "edit" ? 109.57 : 104.2)}>1024×1024 — يحتاج رصيد Neurons</option></select><p className="mt-2 text-xs text-slate-500">الرصيد: {balanceInfo?.neurons.toLocaleString("en-US") ?? "—"} Neurons · المجاني: {balanceInfo?.freeImagesRemaining ?? "—"} صور اليوم · تحرير 512 يخصم 31.42 Neurons</p></div>}
             <label className="mt-7 block text-sm text-slate-300">الوصف أو طلب التعديل</label>
             <Textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "generate" ? "مثال: رأس أوريفون الروبوتي بإضاءة زرقاء نيون وخلفية سوداء سينمائية..." : "مثال: اجعل الخلفية ليلية وحافظ على شكل الوجه كما هو..."} className="mt-2 min-h-36 border-white/10 bg-slate-950/60 text-white placeholder:text-slate-600" />
 
@@ -74,14 +78,14 @@ export default function ImageStudio() {
               {previewUrl && <img src={previewUrl} alt="الصورة المرجعية" className="mt-4 max-h-56 w-full rounded-xl object-contain" />}
             </div>
 
-            <p className="mt-5 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3 text-xs leading-6 text-cyan-100">الإنشاء يبدأ عبر Pollinations AI. إذا تعذر، ينتقل تلقائيًا إلى Gemini كاحتياطي. المهام الثقيلة فقط قد تحتاج رصيدًا من الخطط.</p>
+            <p className="mt-5 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3 text-xs leading-6 text-cyan-100">الإنشاء يبدأ عبر Cloudflare Workers AI. يُستخدم Gemini احتياطيًا عند الأعطال التقنية فقط؛ لا عند نفاد الرصيد أو الحصة.</p>
             <Button onClick={handleSubmit} disabled={pending || !prompt.trim() || (needsImage && !imageBase64)} className="mt-3 h-12 w-full bg-cyan-300 text-base font-semibold text-slate-950 hover:bg-cyan-200">{pending ? <><Loader2 className="ml-2 h-4 w-4 animate-spin" /> جارٍ التنفيذ...</> : <><Sparkles className="ml-2 h-4 w-4" /> إنشاء الصورة</>}</Button>
             {error && <p className="mt-4 rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-sm text-rose-200">{error}</p>}
           </div>
 
           <div className="rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-cyan-300/[0.08] to-transparent p-5 sm:p-7">
             <div className="flex items-center gap-3"><ImagePlus className="h-5 w-5 text-cyan-200" /><h2 className="text-xl font-medium">نتيجة أوريفون</h2></div>
-            {!result && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب وصفًا واضحًا وستُنشأ الصورة أولًا عبر Pollinations AI.</p></div>}
+            {!result && <div className="mt-6 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/45 p-8 text-center"><div className="robot-orb robot-orb-small"><span /><span /></div><p className="mt-8 text-lg text-slate-300">ستظهر النتيجة هنا</p><p className="mt-2 max-w-sm text-sm leading-7 text-slate-500">اكتب وصفًا واضحًا وستُنشأ الصورة عبر Cloudflare Workers AI.</p></div>}
             {result && <div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{result.text}</div>{result.kind === "image" && result.imageDataUrl && <img src={result.imageDataUrl} alt="نتيجة مولدة من أوريفون" className="w-full rounded-2xl border border-white/10 object-contain" />}<div className="flex items-center justify-between text-xs text-slate-500"><span>النموذج: {result.model}</span><span>المتبقي: {result.remaining}</span></div></div>}
           </div>
         </section>

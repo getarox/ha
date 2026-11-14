@@ -9,7 +9,7 @@ let _schemaReady: Promise<void> | null = null;
 
 async function ensureOperationalSchema(pool: { query: (sql: string) => Promise<unknown> }) {
   const statements = [
-    "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
+    "CREATE TABLE IF NOT EXISTS `users` (`id` int AUTO_INCREMENT NOT NULL, `openId` varchar(64) NOT NULL, `firebaseUid` varchar(128) NULL, `name` text, `email` varchar(320), `loginMethod` varchar(64), `role` enum('user','admin') NOT NULL DEFAULT 'user', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, `lastSignedIn` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `users_id` PRIMARY KEY(`id`), CONSTRAINT `users_openId_unique` UNIQUE(`openId`))",
     "CREATE TABLE IF NOT EXISTS `aurevion_sessions` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `consentVersion` varchar(64), `consentLocale` varchar(8), `consentAcceptedAt` timestamp NULL, `plan` enum('free','pro') NOT NULL DEFAULT 'free', `messagesUsed` int NOT NULL DEFAULT 0, `imagesUsed` int NOT NULL DEFAULT 0, `windowStartedAt` timestamp NOT NULL DEFAULT (now()), `lastRequestAt` timestamp, `contextJson` text NOT NULL, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_sessions_id` PRIMARY KEY(`id`), CONSTRAINT `aurevion_sessions_sessionKey_unique` UNIQUE(`sessionKey`))",
     "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `consentVersion` varchar(64) NULL",
     "ALTER TABLE `aurevion_sessions` ADD COLUMN IF NOT EXISTS `consentLocale` varchar(8) NULL",
@@ -20,6 +20,12 @@ async function ensureOperationalSchema(pool: { query: (sql: string) => Promise<u
     "CREATE TABLE IF NOT EXISTS `payments` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `cartId` varchar(64) NOT NULL, `tranRef` varchar(128), `amount` decimal(12,2) NOT NULL, `currency` varchar(3) NOT NULL, `status` enum('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending', `redirectUrl` text, `rawResponse` text, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `payments_id` PRIMARY KEY(`id`), CONSTRAINT `payments_cartId_unique` UNIQUE(`cartId`))",
     "CREATE TABLE IF NOT EXISTS `ai_usage` (`id` int AUTO_INCREMENT NOT NULL, `sessionKey` varchar(128) NOT NULL, `operation` varchar(32) NOT NULL, `provider` varchar(64) NOT NULL, `model` varchar(128), `amount` decimal(12,2) NOT NULL, `requestId` varchar(128), `createdAt` timestamp NOT NULL DEFAULT (now()), CONSTRAINT `ai_usage_id` PRIMARY KEY(`id`), CONSTRAINT `ai_usage_requestId_unique` UNIQUE(`requestId`))",
     "CREATE TABLE IF NOT EXISTS `pricing` (`id` int AUTO_INCREMENT NOT NULL, `operation` varchar(32) NOT NULL, `price` decimal(12,2) NOT NULL, `currency` varchar(3) NOT NULL DEFAULT 'SAR', `active` int NOT NULL DEFAULT 1, CONSTRAINT `pricing_id` PRIMARY KEY(`id`), CONSTRAINT `pricing_operation_unique` UNIQUE(`operation`))",
+    "CREATE TABLE IF NOT EXISTS `neuron_wallets` (`id` int AUTO_INCREMENT NOT NULL, `firebaseUid` varchar(128) NOT NULL, `balance` decimal(18,2) NOT NULL DEFAULT 0.00, `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`), UNIQUE KEY `neuron_wallets_uid_unique` (`firebaseUid`))",
+    "CREATE TABLE IF NOT EXISTS `neuron_ledger` (`id` int AUTO_INCREMENT NOT NULL, `firebaseUid` varchar(128) NOT NULL, `reference` varchar(128) NOT NULL, `type` enum('credit','debit','refund') NOT NULL, `amount` decimal(18,2) NOT NULL, `description` varchar(255), `createdAt` timestamp NOT NULL DEFAULT (now()), PRIMARY KEY (`id`), UNIQUE KEY `neuron_ledger_reference_unique` (`reference`))",
+    "CREATE TABLE IF NOT EXISTS `image_daily_usage` (`id` int AUTO_INCREMENT NOT NULL, `firebaseUid` varchar(128) NOT NULL, `quotaDate` varchar(10) NOT NULL, `freeImagesUsed` int NOT NULL DEFAULT 0, `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`), UNIQUE KEY `image_daily_usage_uid_date_unique` (`firebaseUid`,`quotaDate`))",
+    "CREATE TABLE IF NOT EXISTS `cloudflare_daily_usage` (`quotaDate` varchar(10) NOT NULL, `neuronsUsed` decimal(12,2) NOT NULL DEFAULT 0.00, `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`quotaDate`))",
+    "CREATE TABLE IF NOT EXISTS `image_packages` (`id` int AUTO_INCREMENT NOT NULL, `firebaseUid` varchar(128) NOT NULL, `cartId` varchar(64) NOT NULL, `packageId` varchar(32) NOT NULL, `amountUsd` decimal(10,2) NOT NULL, `neurons` decimal(18,2) NOT NULL, `status` enum('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`), UNIQUE KEY `image_packages_cart_unique` (`cartId`))",
+    "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `firebaseUid` varchar(128) NULL",
     "CREATE TABLE IF NOT EXISTS `aurevion_feedback` (`id` int AUTO_INCREMENT NOT NULL, `category` enum('support','bug','safety','feedback') NOT NULL, `message` text NOT NULL, `sessionId` varchar(128), `userEmail` varchar(320), `status` enum('new','reviewing','resolved') NOT NULL DEFAULT 'new', `createdAt` timestamp NOT NULL DEFAULT (now()), `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT `aurevion_feedback_id` PRIMARY KEY(`id`))",
   ];
   for (const statement of statements) {
@@ -73,9 +79,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       openId: user.openId,
     };
+    if (user.firebaseUid !== undefined) values.firebaseUid = user.firebaseUid;
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "firebaseUid"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {

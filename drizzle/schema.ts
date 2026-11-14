@@ -1,4 +1,4 @@
-import { decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { decimal, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -8,6 +8,7 @@ import { decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "d
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
+  firebaseUid: varchar("firebaseUid", { length: 128 }),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
@@ -89,6 +90,50 @@ export const pricing = mysqlTable("pricing", {
   price: decimal("price", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("SAR").notNull(),
   active: int("active").default(1).notNull(),
+});
+
+export const neuronWallets = mysqlTable("neuron_wallets", {
+  id: int("id").autoincrement().primaryKey(),
+  firebaseUid: varchar("firebaseUid", { length: 128 }).notNull().unique(),
+  balance: decimal("balance", { precision: 18, scale: 2 }).default("0.00").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const neuronLedger = mysqlTable("neuron_ledger", {
+  id: int("id").autoincrement().primaryKey(),
+  firebaseUid: varchar("firebaseUid", { length: 128 }).notNull(),
+  reference: varchar("reference", { length: 128 }).notNull().unique(),
+  type: mysqlEnum("type", ["credit", "debit", "refund"]).notNull(),
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const imageDailyUsage = mysqlTable("image_daily_usage", {
+  id: int("id").autoincrement().primaryKey(),
+  firebaseUid: varchar("firebaseUid", { length: 128 }).notNull(),
+  quotaDate: varchar("quotaDate", { length: 10 }).notNull(),
+  freeImagesUsed: int("freeImagesUsed").default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("image_daily_usage_uid_date_unique").on(table.firebaseUid, table.quotaDate)]);
+
+export const cloudflareDailyUsage = mysqlTable("cloudflare_daily_usage", {
+  quotaDate: varchar("quotaDate", { length: 10 }).primaryKey(),
+  neuronsUsed: decimal("neuronsUsed", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const imagePackages = mysqlTable("image_packages", {
+  id: int("id").autoincrement().primaryKey(),
+  firebaseUid: varchar("firebaseUid", { length: 128 }).notNull(),
+  cartId: varchar("cartId", { length: 64 }).notNull().unique(),
+  packageId: varchar("packageId", { length: 32 }).notNull(),
+  amountUsd: decimal("amountUsd", { precision: 10, scale: 2 }).notNull(),
+  neurons: decimal("neurons", { precision: 18, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["pending", "paid", "failed", "cancelled"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export const aurevionFeedback = mysqlTable("aurevion_feedback", {
