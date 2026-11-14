@@ -26,4 +26,13 @@ export async function authenticateRealOAuthRequest(req: Request) {
   }
 }
 
+export function requireFirebaseAccount(user: User | null | undefined): User & { firebaseUid: string } {
+  const authenticatedUser = requireRealOAuthUser(user);
+  const firebaseUid = authenticatedUser.firebaseUid?.trim();
+  if (!firebaseUid) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "جلسة تسجيل الدخول قديمة. سجّل الدخول مجددًا لتأكيد حساب Firebase." });
+  }
+  return { ...authenticatedUser, firebaseUid };
+}
+
 export const realOAuthProviders = ["google", "email", "phone"] as const;

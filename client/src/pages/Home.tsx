@@ -75,7 +75,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [voiceTone, setVoiceTone] = useState<"female" | "male" | "calm">("female");
   const [consent, setConsent] = useState<{ accepted: boolean; agreement?: { title: string; intro: string; bullets: readonly string[]; accept: string; reject: string; required: string }; locale: "ar" | "en"; loading: boolean }>({ accepted: false, locale: typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("en") ? "en" : "ar", loading: true });
-  const hasRealOAuthUser = user?.loginMethod === "google" || user?.loginMethod === "email" || user?.loginMethod === "phone";
+  const hasRealOAuthUser = Boolean(user?.firebaseUid?.trim()) && (user?.loginMethod === "google" || user?.loginMethod === "email" || user?.loginMethod === "phone");
 
   const status = faceCopy[faceState];
   const messageCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
@@ -217,7 +217,7 @@ export default function Home() {
           <a href="https://aurevion-two.vercel.app/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-300 transition hover:text-white">الموقع التعريفي / Demo <ArrowUpRight className="h-3.5 w-3.5" /></a>
         </nav>
         <div className="flex items-center gap-2">
-          {!user ? <Button type="button" onClick={startLogin} className="bg-cyan-300 text-slate-950 hover:bg-cyan-200">تسجيل الدخول</Button> : null}
+          {!hasRealOAuthUser ? <Button type="button" onClick={startLogin} className="bg-cyan-300 text-slate-950 hover:bg-cyan-200">{user ? "تأكيد الحساب" : "تسجيل الدخول"}</Button> : <span className="hidden max-w-40 truncate text-sm text-cyan-100 sm:block" title={user.name ?? undefined}>{user.name || "حسابي"}</span>}
           <a href="#plans"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">الخطط</Button></a>
           {user?.role === "admin" ? <Link href="/owner" className="hidden sm:block"><Button variant="outline" className="border-cyan-400/30 bg-white/5 text-cyan-100 hover:bg-cyan-300/10">لوحة المالك</Button></Link> : null}
           <Button variant="ghost" size="icon" className="text-slate-300" aria-label="فتح قائمة الإعدادات" aria-controls="aurevion-settings-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Menu className="h-5 w-5" /></Button>
@@ -283,7 +283,17 @@ export default function Home() {
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><span className="eyebrow">02 / BUILT TO GROW</span><h2 className="mt-3 text-3xl font-semibold tracking-tight">عقل مفتوح، <span className="text-cyan-200">مسار واضح.</span></h2></div><p className="max-w-md text-sm leading-6 text-slate-400">تبدأ بخطة مجانية للتجربة، وتنتقل إلى حصة أعلى عندما يكبر استخدامك. فواتير Groq منفصلة عن خطط أوريفون.</p></div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4"><div><p className="text-sm font-medium text-cyan-100">رصيد Neurons والاستخدام المجاني</p><p className="mt-1 text-xs text-slate-400">3 صور مجانية يوميًا بدقة 512×512 · المتبقي اليوم: {freeImagesRemaining}</p></div><div className="flex flex-wrap items-center gap-3"><label className="text-xs text-slate-300">دقة التوليد <select aria-label="دقة توليد الصور" value={imageResolution} onChange={(event) => setImageResolution(Number(event.target.value) as 512 | 1024)} className="ms-2 rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-white"><option value={512}>512×512</option><option value={1024} disabled={neuronBalance === null || neuronBalance < 104.2}>1024×1024 · 104.2 Neurons</option></select></label><div className="text-sm text-slate-300">الرصيد: <span className="font-semibold text-cyan-200">{neuronBalance === null ? "—" : neuronBalance.toLocaleString("en-US")} Neurons</span></div></div></div>
           <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-            {[{id:"eco",name:"إيكو",price:10,neurons:272727},{id:"standard",name:"ستاندر",price:20,neurons:545455},{id:"plus",name:"بلاص",price:30,neurons:818182},{id:"turbo",name:"تربو",price:40,neurons:1090909},{id:"business",name:"بزنز",price:50,neurons:1363636}].map((plan) => <div key={plan.id} className="aurevion-plan"><Zap className="h-5 w-5 text-cyan-200" /><h3 className="mt-8 text-xl font-medium">{plan.name}</h3><div className="mt-4 text-3xl font-semibold text-white">${plan.price}</div><p className="mt-1 text-sm text-slate-400">{plan.neurons.toLocaleString("en-US")} Neurons</p><div className="mt-3 space-y-1 text-xs text-slate-500"><p>صافي الربح (70%): ${(plan.price * 0.7).toFixed(2)}</p><p>تكلفة النقاط (30%): ${(plan.price * 0.3).toFixed(2)}</p></div><Button onClick={() => void startTopUp(plan.id)} disabled={paymentPending !== null} className="mt-6 w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200">{paymentPending === plan.id ? "جارٍ التحويل..." : `شراء $${plan.price}`}</Button></div>)}
+            {[{ id: "eco", name: "إيكو", price: 10, neurons: 272727 }, { id: "standard", name: "ستاندر", price: 20, neurons: 545455 }, { id: "plus", name: "بلاص", price: 30, neurons: 818182 }, { id: "turbo", name: "تربو", price: 40, neurons: 1090909 }, { id: "business", name: "بزنز", price: 50, neurons: 1363636 }].map((plan) => (
+              <div key={plan.id} className="aurevion-plan">
+                <Zap className="h-5 w-5 text-cyan-200" />
+                <h3 className="mt-8 text-xl font-medium">{plan.name}</h3>
+                <div className="mt-4 text-3xl font-semibold text-white">${plan.price}</div>
+                <p className="mt-1 text-sm text-slate-400">{plan.neurons.toLocaleString("en-US")} Neurons</p>
+                <Button onClick={() => void startTopUp(plan.id)} disabled={paymentPending !== null} className="mt-6 w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200">
+                  {paymentPending === plan.id ? "جارٍ التحويل..." : `شراء $${plan.price}`}
+                </Button>
+              </div>
+            ))}
           </div>
         </section>
 
