@@ -7,7 +7,7 @@ import { runImageStudio } from "./imageStudio.js";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc.js";
 import { ENV } from "./_core/env.js";
 import { agreement, acceptConsent, getConsent, requireConsent } from "./consent.js";
-import { requireRealOAuthUser } from "./authGuard.js";
+import { requireFirebaseAccount, requireRealOAuthUser } from "./authGuard.js";
 
 export const appRouter = router({
   system: systemRouter,
@@ -29,11 +29,11 @@ export const appRouter = router({
       return chatWithAurevion(input);
     }),
     imageStudio: publicProcedure.input(z.object({ sessionId: z.string().min(8).max(128), mode: z.enum(["generate", "edit", "analyze", "evaluate"]), prompt: z.string().min(2).max(4000), imageBase64: z.string().max(28_000_000).optional(), mimeType: z.string().max(64).optional(), pro: z.boolean().default(false) })).mutation(async ({ input, ctx }) => {
-      requireRealOAuthUser(ctx.user);
+      const firebaseUser = requireFirebaseAccount(ctx.user);
       await requireConsent(input.sessionId);
       const origin = ctx.req.headers.origin;
       if (typeof origin === "string" && !isAllowedAurevionOrigin(origin)) throw new Error("هذا النطاق غير مصرح له باستخدام استوديو أوريفون.");
-      return runImageStudio(input);
+      return runImageStudio({ ...input, firebaseUid: firebaseUser.firebaseUid });
     }),
     ownerHealth: adminProcedure.query(async () => getAurevionHealth()),
     ownerSetPlan: adminProcedure.input(z.object({ sessionId: z.string().min(8).max(128), plan: z.enum(["free", "pro"]) })).mutation(({ input }) => setAurevionPlan(input.sessionId, input.plan)),

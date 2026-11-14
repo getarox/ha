@@ -244,10 +244,8 @@ export function AIChatBox({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      handleSubmit(event);
-    }
+    // Keep Enter as a newline; only the visible send button submits the draft.
+    if (event.key === "Enter") event.stopPropagation();
   };
 
   const sendRecordedAudio = async (recordedBlob: Blob) => {

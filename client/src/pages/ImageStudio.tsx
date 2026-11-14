@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowUpRight, ImagePlus, Loader2, Sparkles, Upload, WandSparkles } from "lucide-react";
 import { prepareImageForWorker } from "@/lib/prepareImage";
+import { startLogin } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const modes = [
   { id: "generate", label: "بناء صورة", hint: "أنشئ صورة من وصفك" },
@@ -12,6 +14,7 @@ const modes = [
 ] as const;
 
 export default function ImageStudio() {
+  const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<(typeof modes)[number]["id"]>("generate");
   const [prompt, setPrompt] = useState("");
   const [resolution, setResolution] = useState<512 | 1024>(512);
@@ -25,6 +28,10 @@ export default function ImageStudio() {
   const [error, setError] = useState<string>();
 
   useEffect(() => { void fetch("/api/image/balance").then(r => r.ok ? r.json() : null).then(d => d && setBalanceInfo(d)).catch(() => undefined); }, []);
+  const hasFirebaseAccount = Boolean(user?.firebaseUid?.trim()) && ["google", "email", "phone"].includes(user?.loginMethod ?? "");
+
+  if (authLoading) return <main className="min-h-screen bg-[#030711] px-4 py-8 text-white">جارٍ التحقق من الحساب...</main>;
+  if (!hasFirebaseAccount) return <main className="min-h-screen bg-[#030711] px-4 py-8 text-white"><div className="mx-auto max-w-xl rounded-3xl border border-cyan-300/20 bg-white/[0.035] p-8 text-center"><h1 className="text-2xl font-semibold">أكّد حسابك لمتابعة إنشاء الصور</h1><p className="mt-3 leading-7 text-slate-400">جلسة تسجيل الدخول الحالية قديمة أو غير مرتبطة بحساب Firebase. سجّل الدخول مجددًا؛ ستعود بعدها إلى الموقع.</p><Button onClick={startLogin} className="mt-6 bg-cyan-300 text-slate-950 hover:bg-cyan-200">تسجيل الدخول مجددًا</Button></div></main>;
 
   const handleFile = async (file?: File) => {
     if (!file) return;

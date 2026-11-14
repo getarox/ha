@@ -7,7 +7,7 @@ import { transcribeAudio } from "./transcribe.js";
 import { createAurevionFeedback } from "./db.js";
 import { resolveServerImageIntent } from "./imageIntent.js";
 import { agreement, acceptConsent, getConsent, requireConsent } from "./consent.js";
-import { authenticateRealOAuthRequest } from "./authGuard.js";
+import { authenticateRealOAuthRequest, requireFirebaseAccount } from "./authGuard.js";
 
 const requestWindows = new Map<string, { started: number; count: number }>();
 function allowRequest(req: VercelRequest, bucket: string, limit: number) {
@@ -48,24 +48,63 @@ export async function chat(req: VercelRequest, res: VercelResponse) {
     const prompt = latest && typeof latest.content === "string" ? latest.content : "";
     const imageMode = resolveServerImageIntent(prompt, typeof body.imageBase64 === "string");
     if (imageMode) {
-      const chatUser = await authenticateRealOAuthRequest(req as any); if (!chatUser.firebaseUid) return res.status(401).json({error:"تعذر تحديد حساب Firebase الموثق."});
+      const chatUser = requireFirebaseAccount(await authenticateRealOAuthRequest(req as any));
       const result = await runImageStudio({ sessionId: body.sessionId, firebaseUid: chatUser.firebaseUid, mode: imageMode, prompt, imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined, mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined, pro: false });
       return res.status(200).json({ ...result, reply: result.text, imageUrl: "imageDataUrl" in result ? result.imageDataUrl : undefined });
     }
     return res.status(200).json(await chatWithAurevion(body));
-  } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." }); }
+  } catch (error: any) { const code = error?.code; const status = code === "UNAUTHORIZED" ? 401 : code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 503 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر الحصول على رد من أوريفون الآن." }); }
 }
 export async function image(req: VercelRequest, res: VercelResponse) {
   if (!cors(req, res)) return res.status(403).json({ error: "النطاق غير مصرح." }); if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const body = req.body || {};
   if (rateLimited(req, res, "image", 20)) return;
   if (typeof body.sessionId !== "string" || typeof body.mode !== "string" || typeof body.prompt !== "string") return res.status(400).json({ error: "بيانات عملية الصورة غير صالحة." });
   if (!["generate", "edit", "analyze", "evaluate"].includes(body.mode)) return res.status(400).json({ error: "وضع الصورة غير صالح." });
-  try { const authUser = await authenticateRealOAuthRequest(req as any); await requireConsent(body.sessionId); return res.status(200).json(await runImageStudio({ sessionId: body.sessionId, firebaseUid: authUser.firebaseUid ?? undefined, mode: body.mode, prompt: body.prompt, resolution: body.resolution === 1024 ? 1024 : 512, imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined, mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined, pro: false })); } catch (error: any) { const code = error?.code; const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 428 : code === "BAD_REQUEST" ? 400 : 502; return res.status(status).json({ error: error?.message || "تعذر تنفيذ عملية الصور حاليًا." }); }
+  try {
+    const authUser = requireFirebaseAccount(await authenticateRealOAuthRequest(req as any));
+    await requireConsent(body.sessionId);
+    const result = await runImageStudio({
+      sessionId: body.sessionId,
+      firebaseUid: authUser.firebaseUid,
+      mode: body.mode,
+      prompt: body.prompt,
+      resolution: body.resolution === 1024 ? 1024 : 512,
+      imageBase64: typeof body.imageBase64 === "string" ? body.imageBase64 : undefined,
+      mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined,
+      pro: false,
+    });
+    return res.status(200).json(result);
+  } catch (error: any) {
+    const code = error?.code;
+    const status = code === "UNAUTHORIZED" ? 401 : code === "TOO_MANY_REQUESTS" ? 429 : code === "FORBIDDEN" ? 403 : code === "PAYMENT_REQUIRED" ? 402 : code === "PRECONDITION_FAILED" ? 428 : code === "BAD_REQUEST" ? 400 : 502;
+    return res.status(status).json({ error: error?.message || "تعذر تنفيذ عملية الصور حاليًا." });
+  }
 }
 export async function wallet(req: VercelRequest, res: VercelResponse) { if (req.method !== "GET") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : ""; if (sessionId.length < 8) return res.status(400).json({ error: "sessionId غير صالح." }); try { if (!await requireOAuth(req, res)) return; await requireConsent(sessionId); return res.status(200).json(await getWallet(sessionId)); } catch (error: any) { if (error?.code === "PRECONDITION_FAILED") return res.status(428).json({ error: error.message }); console.error("[Wallet] Database failure", error); return res.status(503).json({ error: "خدمة المحفظة غير متاحة حاليًا.", code: "DATABASE_UNAVAILABLE" }); } }
 export async function paymentCreate(req: VercelRequest, res: VercelResponse) { if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); if (rateLimited(req, res, "payment-create", 5)) return; const b = req.body ?? {}; if (typeof b.sessionId !== "string" || b.sessionId.length < 8 || b.sessionId.length > 128 || typeof b.amount !== "number") return res.status(400).json({ error: "بيانات الدفع غير صالحة." }); try { if (!await requireOAuth(req, res)) return; await requireConsent(b.sessionId); return res.status(200).json(await createPayTabsPayment({ sessionKey: b.sessionId, amount: b.amount, description: typeof b.description === "string" ? b.description.slice(0, 255) : undefined, customer: b.customer })); } catch (e: any) { return res.status(e?.code === "PRECONDITION_FAILED" ? 428 : 400).json({ error: e?.message ?? "تعذر إنشاء عملية الدفع." }); } }
-export async function imageBalance(req: VercelRequest,res: VercelResponse) { if(req.method!=="GET") return res.status(405).json({error:"الطريقة غير مسموحة."}); try {const user=await authenticateRealOAuthRequest(req as any); if(!user.firebaseUid) return res.status(401).json({error:"حساب Firebase غير متاح."}); return res.status(200).json({neurons:await neuronBalance(user.firebaseUid),freeImagesRemaining:await freeImagesRemaining(user.firebaseUid),freeImageResolution:"512×512"});} catch(e:any){return res.status(503).json({error:e?.message??"خدمة الرصيد غير متاحة."});} }
-export async function neuronPackageCreate(req:VercelRequest,res:VercelResponse) { if(req.method!=="POST") return res.status(405).json({error:"الطريقة غير مسموحة."}); const b=req.body??{}; if(typeof b.packageId!=="string"||Object.keys(b).some(k=>k!=="packageId")) return res.status(400).json({error:"أرسل packageId فقط."}); try {const user=await authenticateRealOAuthRequest(req as any); if(!user.firebaseUid) return res.status(401).json({error:"حساب Firebase غير متاح."}); const customer={name:user.name,email:user.loginMethod==="phone"?null:user.email,phone:user.loginMethod==="phone"?user.email:null}; return res.status(200).json(await createNeuronPackagePayment(user.firebaseUid,b.packageId,customer));} catch(e:any){return res.status(e?.message==="INVALID_PACKAGE"?400:503).json({error:e?.message??"تعذر بدء الدفع."});} }
+export async function imageBalance(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  try {
+    const user = requireFirebaseAccount(await authenticateRealOAuthRequest(req as any));
+    return res.status(200).json({ neurons: await neuronBalance(user.firebaseUid), freeImagesRemaining: await freeImagesRemaining(user.firebaseUid), freeImageResolution: "512×512" });
+  } catch (error: any) {
+    const status = error?.code === "UNAUTHORIZED" ? 401 : 503;
+    return res.status(status).json({ error: error?.message ?? "خدمة الرصيد غير متاحة." });
+  }
+}
+export async function neuronPackageCreate(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." });
+  const body = req.body ?? {};
+  if (typeof body.packageId !== "string" || Object.keys(body).some(key => key !== "packageId")) return res.status(400).json({ error: "أرسل packageId فقط." });
+  try {
+    const user = requireFirebaseAccount(await authenticateRealOAuthRequest(req as any));
+    const customer = { name: user.name, email: user.loginMethod === "phone" ? null : user.email, phone: user.loginMethod === "phone" ? user.email : null };
+    return res.status(200).json(await createNeuronPackagePayment(user.firebaseUid, body.packageId, customer));
+  } catch (error: any) {
+    const status = error?.code === "UNAUTHORIZED" ? 401 : error?.message === "INVALID_PACKAGE" ? 400 : 503;
+    return res.status(status).json({ error: error?.message ?? "تعذر بدء عملية الشراء." });
+  }
+}
 function raw(req: VercelRequest) { const body = (req as any).rawBody; return Buffer.isBuffer(body) ? body.toString("utf8") : typeof body === "string" ? body : JSON.stringify(req.body ?? {}); }
 export async function paymentCallback(req: VercelRequest, res: VercelResponse) { if (req.method !== "POST") return res.status(405).json({ error: "الطريقة غير مسموحة." }); const sig = req.headers.signature ?? req.headers["x-signature"]; const signature = Array.isArray(sig) ? sig[0] : sig; if (!verifyPayTabsCallback(raw(req), signature)) return res.status(401).json({ error: "توقيع PayTabs غير صالح." }); try { const callbackBody=req.body ?? {}; const cart=String(callbackBody.cart_id??callbackBody.cartId??""); if(cart.startsWith("PKG-")) { try { return res.status(200).json(await settleNeuronPackageCallback(callbackBody)); } catch(e:any) { return res.status(400).json({error:e?.message??"تعذر معالجة callback."}); } } return res.status(200).json(await settlePayTabsCallback(callbackBody)); } catch (e: any) { return res.status(400).json({ error: e?.message ?? "تعذر معالجة callback." }); } }
 export async function paymentReturn(_req: VercelRequest, res: VercelResponse) { return res.status(200).json({ ok: true, message: "تم استلام نتيجة الدفع. سيتم تحديث الرصيد عبر callback الآمن." }); }

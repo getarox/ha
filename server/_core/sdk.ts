@@ -24,6 +24,12 @@ export type SessionPayload = {
   name: string;
 };
 
+export function isValidSessionPayload(payload: Record<string, unknown>): payload is SessionPayload {
+  return isNonEmptyString(payload.openId)
+    && typeof payload.appId === "string"
+    && isNonEmptyString(payload.name);
+}
+
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
@@ -215,21 +221,16 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
 
-      if (
-        !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
-      ) {
+      if (!isValidSessionPayload(payload)) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
       }
 
       return {
-        openId,
-        appId,
-        name,
+        openId: payload.openId,
+        appId: payload.appId,
+        name: payload.name,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
